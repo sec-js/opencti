@@ -3,18 +3,18 @@ import type { SdkStream } from '@smithy/types/dist-types/serde';
 import conf, { logApp } from '../../config/conf';
 import { executionContext } from '../../utils/access';
 import type { AuthContext, AuthUser } from '../../types/user';
-import { consumeQueue, pushToSync, registerConnectorQueues } from '../../database/rabbitmq';
+import { consumeQueue, pushToWorkerForSync, registerConnectorQueues } from '../../database/rabbitmq';
 import { downloadFile } from '../../database/file-storage';
 import { reportExpectation, updateExpectationsNumber, updateProcessedTime, updateReceivedTime } from '../../domain/work';
 import { bundleProcess } from '../../parser/csv-bundler';
 import { OPENCTI_SYSTEM_UUID } from '../../schema/general';
 import { resolveUserByIdFromCache } from '../../domain/user';
 import { parseCsvMapper } from '../../modules/internal/csvMapper/csvMapper-utils';
-import type { ConnectorConfig } from '../connector';
 import { IMPORT_CSV_CONNECTOR } from './importCsv';
-import { internalLoadById } from '../../database/middleware-loader';
 import { DatabaseError, FunctionalError } from '../../config/errors';
 import { uploadToStorage } from '../../database/file-storage-helper';
+import { storeLoadByIdWithRefs } from '../../database/middleware';
+import type { ConnectorConfig } from '../internalConnector';
 
 const RETRY_CONNECTION_PERIOD = 10000;
 
@@ -43,7 +43,7 @@ const initImportCsvConnector = () => {
     const fileId = messageParsed.event.file_id;
     const applicantUser = await resolveUserByIdFromCache(context, applicantId) as AuthUser;
     const entityId = messageParsed.event.entity_id;
-    const entity = entityId ? await internalLoadById(context, applicantUser, entityId) : undefined;
+    const entity = entityId ? await storeLoadByIdWithRefs(context, applicantUser, entityId) : undefined;
     let parsedConfiguration;
     try {
       parsedConfiguration = JSON.parse(messageParsed.configuration);
@@ -82,7 +82,7 @@ const initImportCsvConnector = () => {
             } else {
               await updateExpectationsNumber(context, applicantUser, workId, bundle.objects.length);
               const content = Buffer.from(JSON.stringify(bundle), 'utf-8').toString('base64');
-              await pushToSync({
+              await pushToWorkerForSync({
                 type: 'bundle',
                 update: true,
                 applicant_id: applicantId ?? OPENCTI_SYSTEM_UUID,

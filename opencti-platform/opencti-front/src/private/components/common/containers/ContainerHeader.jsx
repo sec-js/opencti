@@ -43,7 +43,6 @@ import MarkdownDisplay from '../../../../components/MarkdownDisplay';
 import StixCoreObjectFileExport from '../stix_core_objects/StixCoreObjectFileExport';
 import Transition from '../../../../components/Transition';
 import { authorizedMembersToOptions } from '../../../../utils/authorizedMembers';
-import Loader, { LoaderVariant } from '../../../../components/Loader';
 
 // Deprecated - https://mui.com/system/styles/basics/
 // Do not use it for new code.
@@ -446,6 +445,7 @@ const ContainerHeader = (props) => {
   const {
     container,
     PopoverComponent,
+    EditComponent,
     popoverSecurity,
     link,
     modes,
@@ -727,7 +727,7 @@ const ContainerHeader = (props) => {
     // container knowledge / graph style
     containerStyle = {
       position: 'absolute',
-      top: 165 + settingsMessagesBannerHeight,
+      top: 158 + settingsMessagesBannerHeight,
       right: 24,
     };
   }
@@ -756,7 +756,7 @@ const ContainerHeader = (props) => {
   const triggerData = useLazyLoadQuery(stixCoreObjectQuickSubscriptionContentQuery, { first: 20, ...triggersPaginationOptions });
   return (
     <Box sx={containerStyle}>
-      <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+      <React.Suspense fallback={<span />}>
         {!knowledge && (
           <Tooltip
             title={
@@ -866,6 +866,9 @@ const ContainerHeader = (props) => {
             {enableQuickSubscription && (
               <StixCoreObjectSubscribers triggerData={triggerData} />
             )}
+            {!knowledge && disableSharing !== true && (
+              <StixCoreObjectSharing elementId={container.id} variant="header" />
+            )}
             <Security
               needs={[KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS]}
               hasAccess={!!enableManageAuthorizedMembers}
@@ -879,9 +882,6 @@ const ContainerHeader = (props) => {
                 mutation={authorizedMembersMutation}
               />
             </Security>
-            {!knowledge && disableSharing !== true && (
-              <StixCoreObjectSharing elementId={container.id} variant="header" />
-            )}
             {!knowledge && (
               <StixCoreObjectFileExport
                 id={container.id}
@@ -1068,6 +1068,7 @@ const ContainerHeader = (props) => {
                 {React.cloneElement(PopoverComponent, { id: container.id })}
               </Security>
             )}
+            {EditComponent}
           </div>
         </div>
         <div className="clearfix" />
@@ -1084,6 +1085,11 @@ export default createFragmentContainer(ContainerHeader, {
       standard_id
       confidence
       created
+      creators {
+        id
+        name
+        entity_type
+      }
       ... on Report {
         name
       }
@@ -1101,6 +1107,12 @@ export default createFragmentContainer(ContainerHeader, {
       }
       ... on CaseIncident {
         name
+        authorized_members {
+          id
+          name
+          entity_type
+          access_right
+        }
       }
       ... on CaseRfi {
         name

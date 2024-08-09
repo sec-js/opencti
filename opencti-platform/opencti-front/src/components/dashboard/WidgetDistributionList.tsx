@@ -63,6 +63,8 @@ const WidgetDistributionList = ({
               to: link,
             };
           }
+          const cursorStyle = link ? 'pointer' : 'default';
+          const hoverStyle = !link ? { '&.MuiListItemButton-root:hover': { backgroundColor: 'transparent' } } : {};
 
           return (
             <ListItemButton
@@ -70,13 +72,15 @@ const WidgetDistributionList = ({
               dense={true}
               className="noDrag"
               divider={true}
-              disableRipple={publicWidget}
+              disableRipple={publicWidget || !link}
               {...linkProps}
               sx={{
                 height: 50,
                 minHeight: 50,
                 maxHeight: 50,
                 paddingRight: 0,
+                cursor: cursorStyle,
+                ...hoverStyle,
               }}
               style={overflow === 'hidden' && key === data.length - 1 ? { borderBottom: 0 } : {}}
             >
@@ -111,9 +115,6 @@ const WidgetDistributionList = ({
                   marginRight: 20,
                   fontSize: 18,
                   fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
                   color: theme.palette.primary.main,
                 }}
               >

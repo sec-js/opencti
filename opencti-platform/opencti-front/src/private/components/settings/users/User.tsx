@@ -64,8 +64,6 @@ const useStyles = makeStyles(() => ({
     marginBottom: 50,
   },
   paper: {
-    height: '100%',
-    minHeight: '100%',
     margin: '10px 0 0 0',
     padding: '15px',
     borderRadius: 4,
@@ -124,6 +122,8 @@ const UserFragment = graphql`
     groupsOrderMode: { type: "OrderingMode", defaultValue: asc }
     organizationsOrderBy: { type: "OrganizationsOrdering", defaultValue: name }
     organizationsOrderMode: { type: "OrderingMode", defaultValue: asc }
+    rolesOrderBy: { type: "RolesOrdering", defaultValue: name }
+    rolesOrderMode: { type: "OrderingMode", defaultValue: asc }
   ) {
     id
     name
@@ -137,7 +137,7 @@ const UserFragment = graphql`
     language
     api_token
     otp_activated
-    roles {
+    roles(orderBy: $rolesOrderBy, orderMode: $rolesOrderMode) {
       id
       name
       description
@@ -212,9 +212,10 @@ type Session = {
 
 interface UserProps {
   data: User_user$key;
+  refetch: () => void;
 }
 
-const User: FunctionComponent<UserProps> = ({ data }) => {
+const User: FunctionComponent<UserProps> = ({ data, refetch }) => {
   const classes = useStyles();
   const { t_i18n, nsdt, fsd, fldt } = useFormatter();
   const { me } = useAuth();
@@ -258,6 +259,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
         onCompleted: () => {
           setKilling(false);
           handleCloseKillSession();
+          refetch();
         },
       });
     }
@@ -281,6 +283,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
       onCompleted: () => {
         setKilling(false);
         handleCloseKillSessions();
+        refetch();
       },
     });
   };
@@ -317,13 +320,13 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <Typography variant="h4" gutterBottom={true}>
             {t_i18n('Basic information')}
           </Typography>
-          <Paper classes={{ root: classes.paper }} variant="outlined">
+          <Paper classes={{ root: classes.paper }} className="paper-for-grid" variant="outlined">
             <Grid container={true} spacing={3}>
-              <Grid item={true} xs={8}>
+              <Grid item xs={8}>
                 <Typography
                   variant="h3"
                   gutterBottom={true}
@@ -333,7 +336,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                 </Typography>
                 <pre style={{ margin: 0 }}>{user.user_email}</pre>
               </Grid>
-              <Grid item={true} xs={4}>
+              <Grid item xs={4}>
                 <Typography
                   variant="h3"
                   gutterBottom={true}
@@ -357,25 +360,25 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   {user.otp_activated ? t_i18n('Enabled') : t_i18n('Disabled')}
                 </pre>
               </Grid>
-              <Grid item={true} xs={12}>
+              <Grid item xs={12}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Token')}
                 </Typography>
                 <pre style={{ margin: 0 }}>{user.api_token}</pre>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Firstname')}
                 </Typography>
                 {user.firstname || '-'}
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Lastname')}
                 </Typography>
                 {user.lastname || '-'}
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Account status')}
                 </Typography>
@@ -385,7 +388,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   variant="outlined"
                 />
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Account expiration date')}
                 </Typography>
@@ -394,13 +397,13 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
             </Grid>
           </Paper>
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <Typography variant="h4" gutterBottom={true}>
             {t_i18n('Permissions')}
           </Typography>
-          <Paper classes={{ root: classes.paper }} variant="outlined">
+          <Paper classes={{ root: classes.paper }} className={'paper-for-grid'} variant="outlined">
             <Grid container={true} spacing={3}>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Roles')}
                 </Typography>
@@ -431,7 +434,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Groups')}
                 </Typography>
@@ -466,7 +469,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Organizations')}
                 </Typography>
@@ -503,7 +506,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography
                   variant="h3"
                   gutterBottom={true}
@@ -565,12 +568,12 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <HiddenTypesChipList
                   hiddenTypes={user.default_hidden_types ?? []}
                 />
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography
                   variant="h3"
                   gutterBottom={true}
@@ -585,14 +588,15 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
           </Paper>
         </Grid>
         <Triggers recipientId={user.id} filterKey="authorized_members.id" />
-        <Grid item={true} xs={6} style={{ marginTop: 35 }}>
+        <Grid item xs={6} style={{ marginTop: 10 }}>
           <Typography variant="h4" gutterBottom={true}>
             {t_i18n('Operations')}
           </Typography>
           <Paper
             classes={{ root: classes.paper }}
             variant="outlined"
-            style={{ marginTop: 14, minHeight: 500 }}
+            style={{ minHeight: 500 }}
+            className={'paper-for-grid'}
           >
             {!isEnterpriseEdition ? (
               <div style={{ display: 'table', height: '100%', width: '100%' }}>
@@ -665,7 +669,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
             )}
           </Paper>
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 35 }}>
+        <Grid item xs={6} style={{ marginTop: 10 }}>
           {isGrantedToAudit ? (
             <UserHistory userId={user.id} />
           ) : (
@@ -677,6 +681,7 @@ const User: FunctionComponent<UserProps> = ({ data }) => {
                 <Paper
                   classes={{ root: classes.paper }}
                   variant="outlined"
+                  className={'paper-for-grid'}
                 >
                   <span
                     style={{

@@ -28,6 +28,7 @@ import { createFragmentContainer, graphql } from 'react-relay';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuid } from 'uuid';
 import * as Yup from 'yup';
+import Alert from '@mui/material/Alert';
 import DateTimePickerField from '../../../../../components/DateTimePickerField';
 import { useFormatter } from '../../../../../components/i18n';
 import ItemBoolean from '../../../../../components/ItemBoolean';
@@ -61,6 +62,7 @@ import { fieldSpacingContainerStyle } from '../../../../../utils/field';
 import RichTextField from '../../../../../components/fields/RichTextField';
 import Drawer from '../../drawer/Drawer';
 import Transition from '../../../../../components/Transition';
+import { markingDefinitionsLinesSearchQuery } from '../../../settings/marking_definitions/MarkingDefinitionsLines';
 
 // Deprecated - https://mui.com/system/styles/basics/
 // Do not use it for new code.
@@ -148,6 +150,7 @@ const inlineStylesHeaders = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     paddingRight: 10,
+    cursor: 'default',
   },
   markings: {
     float: 'left',
@@ -168,6 +171,7 @@ const inlineStylesHeaders = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     paddingRight: 10,
+    cursor: 'default',
   },
 };
 
@@ -232,8 +236,8 @@ export const workbenchFileContentAttributesQuery = graphql`
 `;
 
 const workbenchFileContentMutation = graphql`
-  mutation WorkbenchFileContentMutation($file: Upload!, $entityId: String) {
-    uploadPending(file: $file, entityId: $entityId) {
+  mutation WorkbenchFileContentMutation($file: Upload!, $entityId: String, $refreshEntity: Boolean) {
+    uploadPending(file: $file, entityId: $entityId, refreshEntity: $refreshEntity) {
       id
     }
   }
@@ -244,6 +248,64 @@ const importValidation = (t) => Yup.object().shape({
 });
 
 const uniqStixDomainObjectsFields = ['name', 'type', 'pattern', 'identity_class', 'x_opencti_location_type'];
+
+// for an entity, get a default value that can be filtered (to check if the entity is in the platform)
+// (simplified version of getMainRepresentative with only the filterable attributes)
+const getEntityMainRepresentativeForWorkbenchChecks = (n, fallback = 'Unknown') => {
+  if (!n) return '';
+  const mainValue = n.name
+    || n.pattern
+    || n.attribute_abstract
+    || n.opinion
+    || n.value
+    || n.source_name
+    || n.phase_name
+    || n.result_name
+    || n.content
+    || n.key
+    || n.path
+    || (n.hashes
+      && (n.hashes.MD5
+        || n.hashes['SHA-1']
+        || n.hashes['SHA-256']
+        || n.hashes['SHA-512']))
+    || getEntityMainRepresentativeForWorkbenchChecks((R.head(n.objects?.edges ?? []))?.node)
+    || n.main_entity_name
+    || fallback;
+  return mainValue;
+};
+
+const defaultValueKeys = {
+  stixDomainObjects: [
+    'name',
+    'aliases',
+    'x_opencti_aliases',
+    'x_mitre_id',
+    'pattern',
+    'attribute_abstract',
+    'opinion',
+    'value',
+    'source_name',
+    'phase_name',
+    'result_name',
+    'content',
+    'main_entity_name',
+  ],
+  stixCyberObservables: [
+    'name',
+    'value',
+    'aliases',
+    'x_opencti_aliases',
+    'value',
+    'content',
+    'attribute_key',
+    'path',
+    'hashes.MD5',
+    'hashes.SHA-1',
+    'hashes.SHA-256',
+    'hashes.SHA-512',
+  ],
+};
 
 const WorkbenchFileContentComponent = ({
   connectorsImport,
@@ -796,7 +858,11 @@ const WorkbenchFileContentComponent = ({
     });
     commitMutation({
       mutation: workbenchFileContentMutation,
-      variables: { file: fileToUpload, entityId: currentEntityId },
+      variables: {
+        file: fileToUpload,
+        entityId: currentEntityId,
+        refreshEntity: values.refreshEntity,
+      },
       onCompleted: () => {
         setTimeout(() => {
           commitMutation({
@@ -832,7 +898,7 @@ const WorkbenchFileContentComponent = ({
     });
   };
 
-  const onSubmitApplyMarking = (values) => {
+  const onSubmitApplyMarking = (values, { resetForm }) => {
     const markingDefinitions = R.pluck('entity', values.objectMarking).map(
       (n) => ({
         ...n,
@@ -861,67 +927,41 @@ const WorkbenchFileContentComponent = ({
     } else {
       objectsToBeProcessed = objects.filter((n) => Object.keys(selectedElements || {}).includes(n.id));
     }
-    let finalStixDomainObjects = stixDomainObjects;
-    let finalStixCyberObservables = stixCyberObservables;
-    let finalStixCoreRelationships = stixCoreRelationships;
-    let finalStixSightings = stixSightings;
-    let finalContainers = containers;
-    if (currentTab === 0) {
-      finalStixDomainObjects = objectsToBeProcessed.map((n) => R.assoc(
-        'object_marking_refs',
-        R.uniq([
-          ...(n.object_marking_refs || []),
-          ...markingDefinitions.map((o) => o.id),
-        ]),
-        n,
-      ));
-    } else if (currentTab === 1) {
-      finalStixCyberObservables = objectsToBeProcessed.map((n) => R.assoc(
-        'object_marking_refs',
-        R.uniq([
-          ...(n.object_marking_refs || []),
-          ...markingDefinitions.map((o) => o.id),
-        ]),
-        n,
-      ));
-    } else if (currentTab === 2) {
-      finalStixCoreRelationships = objectsToBeProcessed.map((n) => R.assoc(
-        'object_marking_refs',
-        R.uniq([
-          ...(n.object_marking_refs || []),
-          ...markingDefinitions.map((o) => o.id),
-        ]),
-        n,
-      ));
-    } else if (currentTab === 3) {
-      finalStixSightings = objectsToBeProcessed.map((n) => R.assoc(
-        'object_marking_refs',
-        R.uniq([
-          ...(n.object_marking_refs || []),
-          ...markingDefinitions.map((o) => o.id),
-        ]),
-        n,
-      ));
-    } else if (currentTab === 4) {
-      finalContainers = objectsToBeProcessed.map((n) => R.assoc(
-        'object_marking_refs',
-        R.uniq([
-          ...(n.object_marking_refs || []),
-          ...markingDefinitions.map((o) => o.id),
-        ]),
-        n,
-      ));
-    }
-    setStixDomainObjects(
-      R.uniqBy(R.prop('id'), [
-        ...finalStixDomainObjects,
-        ...markingDefinitions,
+    const objectsToBeProccessedIds = objectsToBeProcessed.map((n) => n.id);
+    const filteredObjects = objects.filter((n) => !objectsToBeProccessedIds.includes(n.id));
+    const objectsToAdd = objectsToBeProcessed.map((n) => ({
+      ...n,
+      object_marking_refs: R.uniq([
+        ...(n.object_marking_refs || []),
+        ...markingDefinitions.map((o) => o.id),
       ]),
-    );
-    setStixCyberObservables(finalStixCyberObservables);
-    setStixCoreRelationships(finalStixCoreRelationships);
-    setStixSightings(finalStixSightings);
-    setContainers(finalContainers);
+    }));
+    const finalObjects = filteredObjects.concat(objectsToAdd);
+    if (currentTab === 0) {
+      setStixDomainObjects(
+        R.uniqBy(R.prop('id'), [
+          ...finalObjects,
+          ...markingDefinitions,
+        ]),
+      );
+    } else {
+      setStixDomainObjects(
+        R.uniqBy(R.prop('id'), [
+          ...stixDomainObjects,
+          ...markingDefinitions,
+        ]),
+      );
+    }
+    if (currentTab === 1) {
+      setStixCyberObservables(finalObjects);
+    } else if (currentTab === 2) {
+      setStixCoreRelationships(finalObjects);
+    } else if (currentTab === 3) {
+      setStixSightings(finalObjects);
+    } else if (currentTab === 4) {
+      setContainers(finalObjects);
+    }
+    resetForm();
   };
 
   const submitDeleteObject = (obj) => {
@@ -3006,13 +3046,102 @@ const WorkbenchFileContentComponent = ({
     const resolvedStixDomainObjects = stixDomainObjects.map((n) => ({
       ...n,
       ttype: t_i18n(`entity_${convertFromStixType(n.type)}`),
-      default_value: getMainRepresentative(n, null),
+      default_value: getEntityMainRepresentativeForWorkbenchChecks(n, null),
+      // use an adapted version of getMainRepresentative because not possible to filter by representative.main (to check if the entity is in the platform)
       markings: resolveMarkings(stixDomainObjects, n.object_marking_refs),
     }));
     const sort = R.sortWith(
       orderAsc ? [R.ascend(R.prop(sortBy))] : [R.descend(R.prop(sortBy))],
     );
     const sortedStixDomainObjects = sort(resolvedStixDomainObjects);
+
+    const objectExistenceItem = (object, type) => {
+      if (type === 'Marking-Definition') {
+        return (
+          <QueryRenderer
+            query={markingDefinitionsLinesSearchQuery}
+            variables={{
+              filters: {
+                mode: 'and',
+                filters: [{ key: 'definition', values: [object.name] }],
+                filterGroups: [],
+              },
+              first: 1,
+            }}
+            render={({ props }) => {
+              if (props && props.markingDefinitions) {
+                return props.markingDefinitions.edges.length > 0
+                  ? (
+                    <ItemBoolean
+                      variant="inList"
+                      status={true}
+                      label={t_i18n('Yes')}
+                    />
+                  ) : (
+                    <ItemBoolean
+                      variant="inList"
+                      status={false}
+                      label={t_i18n('No')}
+                    />
+                  );
+              }
+              return (
+                <ItemBoolean
+                  variant="inList"
+                  status={undefined}
+                  label={t_i18n('Pending')}
+                />
+              );
+            }}
+          />
+        );
+      }
+      return (
+        <QueryRenderer
+          query={stixDomainObjectsLinesSearchQuery}
+          variables={{
+            types: [type],
+            filters: {
+              mode: 'and',
+              filters: [
+                {
+                  key: defaultValueKeys.stixDomainObjects,
+                  values: [object.default_value],
+                },
+              ],
+              filterGroups: [],
+            },
+            count: 1,
+          }}
+          render={({ props }) => {
+            if (props && props.stixDomainObjects) {
+              return props.stixDomainObjects.edges.length > 0
+                ? (
+                  <ItemBoolean
+                    variant="inList"
+                    status={true}
+                    label={t_i18n('Yes')}
+                  />
+                ) : (
+                  <ItemBoolean
+                    variant="inList"
+                    status={false}
+                    label={t_i18n('No')}
+                  />
+                );
+            }
+            return (
+              <ItemBoolean
+                variant="inList"
+                status={undefined}
+                label={t_i18n('Pending')}
+              />
+            );
+          }}
+        />
+      );
+    };
+
     return (
       <div>
         <List classes={{ root: classes.linesContainer }}>
@@ -3045,9 +3174,9 @@ const WorkbenchFileContentComponent = ({
                 <div>
                   {sortHeader('ttype', 'Type', true)}
                   {sortHeader('default_value', 'Default value', true)}
-                  {sortHeader('labels', 'Labels', true)}
+                  {sortHeader('labels', 'Labels', false)}
                   {sortHeader('markings', 'Marking definitions', true)}
-                  {sortHeader('in_platform', 'Already in plat.', true)}
+                  {sortHeader('in_platform', 'Already in plat.', false)}
                 </div>
               }
             />
@@ -3144,53 +3273,7 @@ const WorkbenchFileContentComponent = ({
                         style={inlineStyles.in_platform}
                       >
                         {object.default_value ? (
-                          <QueryRenderer
-                            query={stixDomainObjectsLinesSearchQuery}
-                            variables={{
-                              types: [type],
-                              filters: {
-                                mode: 'and',
-                                filters: [
-                                  {
-                                    key: [
-                                      'name',
-                                      'aliases',
-                                      'x_opencti_aliases',
-                                      'x_mitre_id',
-                                    ],
-                                    values: [object.default_value],
-                                  },
-                                ],
-                                filterGroups: [],
-                              },
-                              count: 1,
-                            }}
-                            render={({ props }) => {
-                              if (props && props.stixDomainObjects) {
-                                return props.stixDomainObjects.edges.length
-                                  > 0 ? (
-                                    <ItemBoolean
-                                      variant="inList"
-                                      status={true}
-                                      label={t_i18n('Yes')}
-                                    />
-                                  ) : (
-                                    <ItemBoolean
-                                      variant="inList"
-                                      status={false}
-                                      label={t_i18n('No')}
-                                    />
-                                  );
-                              }
-                              return (
-                                <ItemBoolean
-                                  variant="inList"
-                                  status={undefined}
-                                  label={t_i18n('Pending')}
-                                />
-                              );
-                            }}
-                          />
+                          objectExistenceItem(object, type)
                         ) : (
                           <ItemBoolean
                             variant="inList"
@@ -3249,7 +3332,7 @@ const WorkbenchFileContentComponent = ({
     const resolvedStixCyberObservables = stixCyberObservables.map((n) => ({
       ...n,
       ttype: t_i18n(`entity_${convertFromStixType(n.type)}`),
-      default_value: getMainRepresentative(n, null),
+      default_value: getEntityMainRepresentativeForWorkbenchChecks(n, null),
       markings: resolveMarkings(stixDomainObjects, n.object_marking_refs),
     }));
     const sort = R.sortWith(
@@ -3288,9 +3371,9 @@ const WorkbenchFileContentComponent = ({
                 <div>
                   {sortHeader('ttype', 'Type', true)}
                   {sortHeader('default_value', 'Default value', true)}
-                  {sortHeader('labels', 'Labels', true)}
+                  {sortHeader('labels', 'Labels', false)}
                   {sortHeader('markings', 'Marking definitions', true)}
-                  {sortHeader('in_platform', 'Already in plat.', true)}
+                  {sortHeader('in_platform', 'Already in plat.', false)}
                 </div>
               }
             />
@@ -3396,13 +3479,7 @@ const WorkbenchFileContentComponent = ({
                                 mode: 'and',
                                 filters: [
                                   {
-                                    key: [
-                                      'name',
-                                      'value',
-                                      'hashes.MD5',
-                                      'hashes.SHA-1',
-                                      'hashes.SHA-256',
-                                    ],
+                                    key: defaultValueKeys.stixCyberObservables,
                                     values: [object.default_value],
                                   },
                                 ],
@@ -3534,7 +3611,7 @@ const WorkbenchFileContentComponent = ({
                 <div>
                   {sortHeader('ttype', 'Type', true)}
                   {sortHeader('default_value', 'Default value', true)}
-                  {sortHeader('labels', 'Labels', true)}
+                  {sortHeader('labels', 'Labels', false)}
                   {sortHeader('markings', 'Marking definitions', true)}
                 </div>
               }
@@ -3686,7 +3763,7 @@ const WorkbenchFileContentComponent = ({
                 <div>
                   {sortHeader('ttype', 'Type', true)}
                   {sortHeader('default_value', 'Default value', true)}
-                  {sortHeader('labels', 'Labels', true)}
+                  {sortHeader('labels', 'Labels', false)}
                   {sortHeader('markings', 'Marking definitions', true)}
                 </div>
               }
@@ -3852,9 +3929,9 @@ const WorkbenchFileContentComponent = ({
                 <div>
                   {sortHeader('ttype', 'Type', true)}
                   {sortHeader('default_value', 'Default value', true)}
-                  {sortHeader('labels', 'Labels', true)}
+                  {sortHeader('labels', 'Labels', false)}
                   {sortHeader('markings', 'Marking definitions', true)}
-                  {sortHeader('in_platform', 'Already in plat.', true)}
+                  {sortHeader('in_platform', 'Already in plat.', false)}
                 </div>
               }
             />
@@ -3935,12 +4012,7 @@ const WorkbenchFileContentComponent = ({
                                 mode: 'and',
                                 filters: [
                                   {
-                                    key: [
-                                      'name',
-                                      'aliases',
-                                      'x_opencti_aliases',
-                                      'x_mitre_id',
-                                    ],
+                                    key: defaultValueKeys.stixDomainObjects,
                                     values: [object.default_value],
                                   },
                                   {
@@ -4086,6 +4158,7 @@ const WorkbenchFileContentComponent = ({
       <Formik
         enableReinitialize={true}
         initialValues={{
+          refreshEntity: !!file.metaData.entity_id && !!file.metaData.entity,
           connector_id: connectors.length > 0 ? connectors[0].id : '',
         }}
         validationSchema={importValidation(t_i18n)}
@@ -4103,6 +4176,24 @@ const WorkbenchFileContentComponent = ({
             >
               <DialogTitle>{t_i18n('Validate and send for import')}</DialogTitle>
               <DialogContent>
+                {!!file.metaData.entity_id && !!file.metaData.entity && (
+                  <>
+                    <Alert severity="info" variant="outlined">
+                      <Typography>
+                        {t_i18n('Having this checked means the last version of the entity linked to the workbench will be fetched from database before executing the workbench.')}
+                      </Typography>
+                      <Typography>
+                        {t_i18n('Because by default the workbench won\'t include the updates made on the entity after the creation of the workbench.')}
+                      </Typography>
+                    </Alert>
+                    <Field
+                      component={SwitchField}
+                      type="checkbox"
+                      name="refreshEntity"
+                      label={t_i18n('Refresh entity')}
+                    />
+                  </>
+                )}
                 <Field
                   component={SelectField}
                   variant="standard"

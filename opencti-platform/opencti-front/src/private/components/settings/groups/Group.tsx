@@ -49,8 +49,6 @@ const useStyles = makeStyles(() => ({
     marginTop: '-13px',
   },
   paper: {
-    height: '100%',
-    minHeight: '100%',
     margin: '10px 0 0 0',
     padding: '15px',
     borderRadius: 4,
@@ -68,24 +66,16 @@ const groupFragment = graphql`
     name
     default_assignation
     auto_new_marking
+    restrict_delete
+    no_creators
     group_confidence_level {
       max_confidence
-      overrides{
+      overrides {
         max_confidence
         entity_type
       }
     }
     description
-    members {
-      edges {
-        node {
-          ...UserLine_node
-        }
-      }
-    }
-    group_confidence_level {
-      max_confidence
-    }
     default_dashboard {
       id
       name
@@ -172,13 +162,13 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <Typography variant="h4" gutterBottom={true}>
             {t_i18n('Basic information')}
           </Typography>
-          <Paper classes={{ root: classes.paper }} variant="outlined">
+          <Paper classes={{ root: classes.paper }} className={'paper-for-grid'} variant="outlined">
             <Grid container={true} spacing={3}>
-              <Grid item={true} xs={12}>
+              <Grid item xs={12}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Description')}
                 </Typography>
@@ -187,10 +177,10 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   limit={400}
                 />
               </Grid>
-              <Grid item={true} xs={12}>
+              <Grid item xs={12}>
                 <GroupHiddenTypesChipList groupData={group} />
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Auto new markings')}
                 </Typography>
@@ -199,7 +189,7 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   label={group.auto_new_marking ? t_i18n('Yes') : t_i18n('No')}
                 />
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Default membership')}
                 </Typography>
@@ -211,13 +201,13 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
             </Grid>
           </Paper>
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <Typography variant="h4" gutterBottom={true}>
             {t_i18n('Permissions')}
           </Typography>
-          <Paper classes={{ root: classes.paper }} variant="outlined">
+          <Paper classes={{ root: classes.paper }} className={'paper-for-grid'} variant="outlined">
             <Grid container={true} spacing={3}>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Roles')}
                 </Typography>
@@ -239,7 +229,7 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   ))}
                 </List>
               </Grid>
-              <Grid item={true} xs={6}>
+              <Grid item xs={6}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Default dashboard')}
                 </Typography>
@@ -273,7 +263,7 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={12}>
+              <Grid item xs={12}>
                 <Typography
                   variant="h3"
                   gutterBottom={true}
@@ -286,17 +276,35 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   confidenceLevel={group.group_confidence_level}
                 />
               </Grid>
+              <Grid item xs={6}>
+                <Typography variant="h3" gutterBottom={true}>
+                  {t_i18n('No creators accumulation')}
+                </Typography>
+                <ItemBoolean
+                  status={group.no_creators ?? false}
+                  label={group.no_creators ? t_i18n('Yes') : t_i18n('No')}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="h3" gutterBottom={true}>
+                  {t_i18n('Restrict delete to created entities')}
+                </Typography>
+                <ItemBoolean
+                  status={group.restrict_delete ?? false}
+                  label={group.restrict_delete ? t_i18n('Yes') : t_i18n('No')}
+                />
+              </Grid>
             </Grid>
           </Paper>
         </Grid>
-        <Grid item={true} xs={12} style={{ marginTop: 30 }}>
+        <Grid item xs={12}>
           <Typography variant="h4" gutterBottom={true} style={{ float: 'left' }}>
             {t_i18n('Markings')}
           </Typography>
           <div className="clearfix" />
-          <Paper classes={{ root: classes.paper }} variant="outlined">
+          <Paper classes={{ root: classes.paper }} className={'paper-for-grid'} variant="outlined">
             <Grid container={true} spacing={3}>
-              <Grid item={true} xs={4}>
+              <Grid item xs={4}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Default markings')}
                   <Tooltip
@@ -334,7 +342,7 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={4}>
+              <Grid item xs={4}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Allowed markings')}
                 </Typography>
@@ -361,7 +369,7 @@ const Group = ({ groupData }: { groupData: Group_group$key }) => {
                   </List>
                 </FieldOrEmpty>
               </Grid>
-              <Grid item={true} xs={4}>
+              <Grid item xs={4}>
                 <Typography variant="h3" gutterBottom={true}>
                   {t_i18n('Maximum shareable markings')}
                 </Typography>

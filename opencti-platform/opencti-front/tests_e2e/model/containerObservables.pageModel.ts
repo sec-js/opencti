@@ -5,7 +5,7 @@ export default class ContainerObservablesPage {
   constructor(private page: Page) {
   }
 
-  getContainerObservablesPage() {
+  getPage() {
     return this.page.getByTestId('container-observables-pages');
   }
 
@@ -14,6 +14,6 @@ export default class ContainerObservablesPage {
   }
 
   getAddObservableListButton() {
-    return this.page.getByLabel('Add', { exact: true });
+    return this.page.getByLabel('Add observable', { exact: true });
   }
 }

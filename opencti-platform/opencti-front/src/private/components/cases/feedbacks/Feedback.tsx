@@ -2,6 +2,7 @@ import React, { FunctionComponent } from 'react';
 import { graphql, useFragment } from 'react-relay';
 import Grid from '@mui/material/Grid';
 import makeStyles from '@mui/styles/makeStyles';
+import useHelper from 'src/utils/hooks/useHelper';
 import FeedbackDetails from './FeedbackDetails';
 import StixDomainObjectOverview from '../../common/stix_domain_objects/StixDomainObjectOverview';
 import ContainerStixObjectsOrStixRelationships from '../../common/containers/ContainerStixObjectsOrStixRelationships';
@@ -11,6 +12,7 @@ import FeedbackEdition from './FeedbackEdition';
 import StixCoreObjectExternalReferences from '../../analyses/external_references/StixCoreObjectExternalReferences';
 import StixCoreObjectLatestHistory from '../../common/stix_core_objects/StixCoreObjectLatestHistory';
 import { Feedback_case$key } from './__generated__/Feedback_case.graphql';
+import { getCurrentUserAccessRight } from '../../../../utils/authorizedMembers';
 
 // Deprecated - https://mui.com/system/styles/basics/
 // Do not use it for new code.
@@ -88,9 +90,10 @@ interface FeedbackProps {
 const FeedbackComponent: FunctionComponent<FeedbackProps> = ({ data, enableReferences }) => {
   const classes = useStyles();
   const feedbackData = useFragment(feedbackFragment, data);
+  const { isFeatureEnable } = useHelper();
+  const FABReplaced = isFeatureEnable('FAB_REPLACEMENT');
 
-  const canManage = feedbackData.currentUserAccessRight === 'admin';
-  const canEdit = canManage || feedbackData.currentUserAccessRight === 'edit';
+  const { canEdit } = getCurrentUserAccessRight(feedbackData);
 
   return (
     <>
@@ -99,35 +102,37 @@ const FeedbackComponent: FunctionComponent<FeedbackProps> = ({ data, enableRefer
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <FeedbackDetails feedbackData={feedbackData} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview
             stixDomainObject={feedbackData}
             displayAssignees={true}
             displayConfidence={false}
           />
         </Grid>
-        <Grid item={true} xs={12} style={{ marginTop: 30 }}>
+        <Grid item xs={12}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={feedbackData}
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectExternalReferences
             stixCoreObjectId={feedbackData.id}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={feedbackData.id} />
         </Grid>
       </Grid>
-      <Security needs={[KNOWLEDGE_KNUPDATE]} hasAccess={canEdit}>
-        <FeedbackEdition feedbackId={feedbackData.id} />
-      </Security>
+      {!FABReplaced
+        && <Security needs={[KNOWLEDGE_KNUPDATE]} hasAccess={canEdit}>
+          <FeedbackEdition feedbackId={feedbackData.id} />
+        </Security>
+      }
     </>
   );
 };

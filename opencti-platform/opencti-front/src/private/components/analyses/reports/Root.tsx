@@ -10,6 +10,7 @@ import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
+import Security from 'src/utils/Security';
 import StixCoreObjectSimulationResult from '../../common/stix_core_objects/StixCoreObjectSimulationResult';
 import { QueryRenderer } from '../../../../relay/environment';
 import Report from './Report';
@@ -26,8 +27,10 @@ import StixCoreObjectFilesAndHistory from '../../common/stix_core_objects/StixCo
 import Breadcrumbs from '../../../../components/Breadcrumbs';
 import { useFormatter } from '../../../../components/i18n';
 import { useIsEnforceReference } from '../../../../utils/hooks/useEntitySettings';
-import useGranted, { KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE } from '../../../../utils/hooks/useGranted';
+import useGranted, { KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE, KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
 import { getCurrentTab, getPaddingRight } from '../../../../utils/utils';
+import ReportEdition from './ReportEdition';
+import useHelper from '../../../../utils/hooks/useHelper';
 
 const subscription = graphql`
   subscription RootReportSubscription($id: ID!) {
@@ -84,6 +87,8 @@ const RootReport = () => {
     [reportId],
   );
   const location = useLocation();
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   const enableReferences = useIsEnforceReference('Report') && !useGranted([KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE]);
   const { t_i18n } = useFormatter();
   useSubscription(subConfig);
@@ -112,6 +117,11 @@ const RootReport = () => {
                     PopoverComponent={
                       <ReportPopover id={reportId} />
                     }
+                    EditComponent={isFABReplaced && (
+                      <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                        <ReportEdition reportId={report.id} />
+                      </Security>
+                    )}
                     enableQuickSubscription={true}
                     enableQuickExport={true}
                     enableAskAi={true}
@@ -123,6 +133,9 @@ const RootReport = () => {
                       borderBottom: 1,
                       borderColor: 'divider',
                       marginBottom: 4,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItem: 'center',
                     }}
                   >
                     <Tabs
@@ -173,7 +186,7 @@ const RootReport = () => {
                     <Route
                       path="/"
                       element={
-                        <Report report={report} />
+                        <Report reportFragment={report} />
                       }
                     />
                     <Route

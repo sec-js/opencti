@@ -64,7 +64,7 @@ export const convertToStixType = (type) => {
   if (['Threat-Actor-Group', 'Threat-Actor-Individual'].includes(type)) {
     return 'threat-actor';
   }
-  if (['Region', 'Country', 'City', 'Position'].includes(type)) {
+  if (['Region', 'Country', 'City', 'Position', 'Administrative-Area'].includes(type)) {
     return 'location';
   }
   return type.toLowerCase();
@@ -124,3 +124,12 @@ export const renderObservableValue = (observable) => {
 };
 
 export const emptyFilled = (str) => (isNotEmptyField(str) ? str : '-');
+
+/**
+ * @param str {string}
+ * @returns {string[]}
+ */
+export const splitMultilines = (str) => str
+  .split(/\r?\n/)
+  .filter((v) => !!v)
+  .map((s) => s.trim());

@@ -1,3 +1,4 @@
+import { buttonClasses } from '@mui/material/Button';
 import type { ExtendedThemeOptions } from './Theme';
 import { fileUri } from '../relay/environment';
 import LogoText from '../static/images/logo_text_dark.png';
@@ -36,9 +37,13 @@ const ThemeDark = (
     success: { main: '#03a847' },
     primary: { main: primary || THEME_DARK_DEFAULT_PRIMARY },
     secondary: { main: secondary || THEME_DARK_DEFAULT_SECONDARY },
+    border: {
+      primary: hexToRGB((primary || THEME_DARK_DEFAULT_PRIMARY), 0.3),
+      secondary: hexToRGB((secondary || THEME_DARK_DEFAULT_SECONDARY), 0.3),
+      pagination: hexToRGB('#ffffff', 0.5),
+    },
     pagination: {
       main: '#ffffff',
-      border: hexToRGB('#ffffff', 0.5),
     },
     chip: { main: '#ffffff' },
     ee: {
@@ -90,6 +95,7 @@ const ThemeDark = (
       fontFamily: '"Geoligica", sans-serif',
     },
     h4: {
+      height: 15,
       margin: '0 0 10px 0',
       padding: 0,
       textTransform: 'uppercase',
@@ -120,6 +126,15 @@ const ThemeDark = (
       defaultProps: {
         TransitionProps: {
           unmountOnExit: true,
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          [`&.${buttonClasses.outlined}.${buttonClasses.sizeSmall}`]: {
+            padding: '4px 9px',
+          },
         },
       },
     },

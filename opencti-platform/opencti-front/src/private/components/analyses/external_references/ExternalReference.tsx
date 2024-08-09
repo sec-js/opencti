@@ -2,6 +2,7 @@ import React, { FunctionComponent } from 'react';
 import { createFragmentContainer, graphql } from 'react-relay';
 import Grid from '@mui/material/Grid';
 import makeStyles from '@mui/styles/makeStyles';
+import useHelper from 'src/utils/hooks/useHelper';
 import ExternalReferenceOverview from './ExternalReferenceOverview';
 import ExternalReferenceDetails from './ExternalReferenceDetails';
 import ExternalReferenceEdition from './ExternalReferenceEdition';
@@ -39,6 +40,8 @@ const ExternalReferenceComponent: FunctionComponent<
 ExternalReferenceComponentProps
 > = ({ externalReference, connectorsImport }) => {
   const classes = useStyles();
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   return (
     <div className={classes.container}>
       <ExternalReferenceHeader
@@ -46,33 +49,40 @@ ExternalReferenceComponentProps
         PopoverComponent={
           <ExternalReferencePopover id={''} handleRemove={undefined} />
         }
+        EditComponent={(
+          <Security needs={[KNOWLEDGE_KNUPDATE]}>
+            <ExternalReferenceEdition externalReferenceId={externalReference.id} />
+          </Security>
+        )}
       />
       <Grid
         container={true}
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6} >
           <ExternalReferenceOverview externalReference={externalReference} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6} >
           <ExternalReferenceDetails externalReference={externalReference} />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ExternalReferenceStixCoreObjects
             externalReference={externalReference}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ExternalReferenceFileImportViewer
             externalReference={externalReference}
             connectorsImport={connectorsImport}
           />
         </Grid>
       </Grid>
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <ExternalReferenceEdition externalReferenceId={externalReference.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <ExternalReferenceEdition externalReferenceId={externalReference.id} />
+        </Security>
+      )}
     </div>
   );
 };

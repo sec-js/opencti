@@ -41,6 +41,7 @@ const KNOWLEDGE_CAPABILITIES = {
         { name: KNOWLEDGE_DELETE, description: 'Delete knowledge', attribute_order: 300 },
         { name: KNOWLEDGE_MANAGE_AUTH_MEMBERS, description: 'Manage authorized members', attribute_order: 310 },
         { name: 'KNBYPASSREFERENCE', description: 'Bypass enforced reference', attribute_order: 320 },
+        { name: 'KNBYPASSFIELDS', description: 'Bypass mandatory fields', attribute_order: 330 },
       ],
     },
     { name: 'KNUPLOAD', description: 'Upload knowledge files', attribute_order: 400 },
@@ -199,12 +200,14 @@ const createVocabularies = async (context) => {
     const vocabularies = openVocabularies[category] ?? [];
     for (let i = 0; i < vocabularies.length; i += 1) {
       const { key, description, aliases, order } = vocabularies[i];
-      const data = { name: key,
+      const data = {
+        name: key,
         description: description ?? '',
         aliases: aliases ?? [],
         category,
         order,
-        builtIn: builtInOv.includes(category) };
+        builtIn: builtInOv.includes(category)
+      };
       await addVocabulary(context, SYSTEM_USER, data);
     }
   }

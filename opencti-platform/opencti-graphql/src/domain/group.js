@@ -6,7 +6,7 @@ import {
   listAllToEntitiesThroughRelations,
   listEntities,
   listEntitiesThroughRelationsPaginated,
-  storeLoadById
+  storeLoadById,
 } from '../database/middleware-loader';
 import { BUS_TOPICS } from '../config/conf';
 import { delEditContext, notify, setEditContext } from '../database/redis';
@@ -29,6 +29,7 @@ const groupSessionRefresh = async (context, user, groupId) => {
   const members = await listAllFromEntitiesThroughRelations(context, user, groupId, RELATION_MEMBER_OF, ENTITY_TYPE_USER);
   const sessions = await findSessionsForUsers(members.map((e) => e.internal_id));
   await Promise.all(sessions.map((s) => markSessionForRefresh(s.id)));
+  members.map((m) => notify(BUS_TOPICS[ENTITY_TYPE_USER].EDIT_TOPIC, m, user));
 };
 
 export const findById = (context, user, groupId) => {
@@ -108,11 +109,11 @@ export const defaultMarkingDefinitionsFromGroups = async (context, groupIds) => 
 };
 
 export const rolesPaginated = async (context, user, groupId, args) => {
-  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_HAS_ROLE, ENTITY_TYPE_ROLE, false, false, args);
+  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_HAS_ROLE, ENTITY_TYPE_ROLE, false, args);
 };
 
 export const membersPaginated = async (context, user, groupId, args) => {
-  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_MEMBER_OF, ENTITY_TYPE_USER, true, false, args);
+  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_MEMBER_OF, ENTITY_TYPE_USER, true, args);
 };
 
 export const groupDelete = async (context, user, groupId) => {
@@ -225,10 +226,10 @@ export const groupEditDefaultMarking = async (context, user, groupId, defaultMar
 
 export const groupCleanContext = async (context, user, groupId) => {
   await delEditContext(user, groupId);
-  return storeLoadById(context, user, groupId, ENTITY_TYPE_GROUP).then((group) => notify(BUS_TOPICS.Group.EDIT_TOPIC, group, user));
+  return storeLoadById(context, user, groupId, ENTITY_TYPE_GROUP); // notify removed for performance issues with users cache
 };
 
 export const groupEditContext = async (context, user, groupId, input) => {
   await setEditContext(user, groupId, input);
-  return storeLoadById(context, user, groupId, ENTITY_TYPE_GROUP).then((group) => notify(BUS_TOPICS.Group.EDIT_TOPIC, group, user));
+  return storeLoadById(context, user, groupId, ENTITY_TYPE_GROUP); // notify removed for performance issues with users cache
 };

@@ -51,6 +51,7 @@ interface Measures {
   measure: number | null
   date_seen: object | string | null
 }
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 export const schemaMeasure: JSONSchemaType<Measures[]> = {
@@ -82,6 +83,17 @@ const THREAT_ACTOR_INDIVIDUAL_DEFINITION: ModuleDefinition<StoreEntityThreatActo
       },
     },
   },
+  overviewLayoutCustomization: [
+    { key: 'details', width: 6, label: 'Entity details' },
+    { key: 'basicInformation', width: 6, label: 'Basic information' },
+    { key: 'demographics', width: 6, label: 'Demographics' },
+    { key: 'biographics', width: 6, label: 'Biographics' },
+    { key: 'latestCreatedRelationships', width: 6, label: 'Latest created relationships' },
+    { key: 'latestContainers', width: 6, label: 'Latest containers' },
+    { key: 'externalReferences', width: 6, label: 'External references' },
+    { key: 'mostRecentHistory', width: 6, label: 'Most recent history' },
+    { key: 'notes', width: 12, label: 'Notes about this entity' },
+  ],
   attributes: [
     { name: 'name', label: 'Name', type: 'string', format: 'short', mandatoryType: 'external', editDefault: true, multiple: false, upsert: true, isFilterable: true },
     { name: 'description', label: 'Description', type: 'string', format: 'text', mandatoryType: 'customizable', editDefault: true, multiple: false, upsert: true, isFilterable: true },

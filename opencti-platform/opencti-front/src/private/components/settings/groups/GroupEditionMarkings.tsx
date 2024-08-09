@@ -283,7 +283,7 @@ const GroupEditionMarkingsComponent = ({
                 >
                   {() => (
                     <Form>
-                      <Typography variant="h2" style={{ marginTop: 30 }}>
+                      <Typography variant="h2" style={{ marginTop: 20 }}>
                         {t_i18n('Default marking definitions')}
                       </Typography>
                       <Alert

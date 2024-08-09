@@ -54,7 +54,6 @@ import {
   INTERNAL_USERS,
   isBypassUser,
   isUserHasCapability,
-  KNOWLEDGE_ORGANIZATION_RESTRICT,
   REDACTED_USER,
   SETTINGS_SET_ACCESSES,
   SYSTEM_USER,
@@ -227,15 +226,15 @@ export const batchCreators = async (context, user, userListIds) => {
 };
 
 export const userOrganizationsPaginated = async (context, user, userId, opts) => {
-  return listEntitiesThroughRelationsPaginated(context, user, userId, RELATION_PARTICIPATE_TO, ENTITY_TYPE_IDENTITY_ORGANIZATION, false, false, opts);
+  return listEntitiesThroughRelationsPaginated(context, user, userId, RELATION_PARTICIPATE_TO, ENTITY_TYPE_IDENTITY_ORGANIZATION, false, opts);
 };
 
 export const userGroupsPaginated = async (context, user, userId, opts) => {
-  return listEntitiesThroughRelationsPaginated(context, user, userId, RELATION_MEMBER_OF, ENTITY_TYPE_GROUP, false, false, opts);
+  return listEntitiesThroughRelationsPaginated(context, user, userId, RELATION_MEMBER_OF, ENTITY_TYPE_GROUP, false, opts);
 };
 
 export const groupRolesPaginated = async (context, user, groupId, opts) => {
-  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_HAS_ROLE, ENTITY_TYPE_ROLE, false, false, opts);
+  return listEntitiesThroughRelationsPaginated(context, user, groupId, RELATION_HAS_ROLE, ENTITY_TYPE_ROLE, false, opts);
 };
 
 export const batchRolesForUsers = async (context, user, userIds, opts = {}) => {
@@ -352,7 +351,7 @@ export const getRoles = async (context, userGroups) => {
   return listAllToEntitiesThroughRelations(context, SYSTEM_USER, groupIds, RELATION_HAS_ROLE, ENTITY_TYPE_ROLE);
 };
 
-export const getCapabilities = async (context, userId, userRoles, isUserPlatform) => {
+export const getCapabilities = async (context, userId, userRoles) => {
   const roleIds = userRoles.map((r) => r.id);
   const capabilities = await listAllToEntitiesThroughRelations(context, SYSTEM_USER, roleIds, RELATION_HAS_CAPABILITY, ENTITY_TYPE_CAPABILITY);
   // Force push the bypass for default admin
@@ -362,7 +361,7 @@ export const getCapabilities = async (context, userId, userRoles, isUserPlatform
     capabilities.push({ id, standard_id: id, internal_id: id, name: BYPASS });
     return capabilities;
   }
-  return isUserPlatform ? capabilities : capabilities.filter((c) => c.name !== KNOWLEDGE_ORGANIZATION_RESTRICT);
+  return capabilities;
 };
 
 export const roleCapabilities = async (context, user, roleId) => {
@@ -429,7 +428,7 @@ export const assignOrganizationToUser = async (context, user, userId, organizati
     event_scope: 'update',
     event_access: 'administration',
     message: `adds ${created.toType} \`${extractEntityRepresentativeName(created.to)}\` to user \`${actionEmail}\``,
-    context_data: { id: organizationId, entity_type: ENTITY_TYPE_USER, input }
+    context_data: { id: userId, entity_type: ENTITY_TYPE_USER, input }
   });
 
   await userSessionRefresh(userId);
@@ -1233,6 +1232,8 @@ const buildSessionUser = (origin, impersonate, provider, settings) => {
     })),
     session_version: PLATFORM_VERSION,
     effective_confidence_level: user.effective_confidence_level,
+    no_creators: user.no_creators,
+    restrict_delete: user.restrict_delete,
     personal_notifiers: user.personal_notifiers,
     ...user.provider_metadata
   };
@@ -1281,7 +1282,8 @@ export const buildCompleteUser = async (context, client) => {
   const isUserPlatform = settings.platform_organization ? userOrganizations.includes(settings.platform_organization) : true;
   const [individuals, organizations, groups] = await Promise.all([individualsPromise, organizationsPromise, userGroupsPromise]);
   const roles = await getRoles(context, groups);
-  const capabilities = await getCapabilities(context, client.id, roles, isUserPlatform);
+  const capabilities = await getCapabilities(context, client.id, roles);
+  const isByPass = R.find((s) => s.name === BYPASS, capabilities) !== undefined;
   const marking = await getUserAndGlobalMarkings(context, client.id, groups, capabilities);
   const administrated_organizations = organizations.filter((o) => o.authorized_authorities?.includes(client.id));
   if (administrated_organizations.length > 0) {
@@ -1296,6 +1298,10 @@ export const buildCompleteUser = async (context, client) => {
 
   // effective confidence level
   const effective_confidence_level = computeUserEffectiveConfidenceLevel({ ...client, groups, capabilities });
+
+  // Other groups attribute
+  const no_creators = groups.filter((g) => g.no_creators).length === groups.length;
+  const restrict_delete = !isByPass && groups.filter((g) => g.restrict_delete).length === groups.length;
 
   return {
     ...client,
@@ -1313,6 +1319,8 @@ export const buildCompleteUser = async (context, client) => {
     default_marking: marking.default,
     max_shareable_marking: marking.max_shareable,
     effective_confidence_level,
+    no_creators,
+    restrict_delete,
   };
 };
 
@@ -1547,21 +1555,37 @@ export const userEditContext = async (context, user, userId, input) => {
 };
 // endregion
 
-export const getUserEffectiveConfidenceLevel = async (user, context) => {
-  // we load the user from cache to have the complete user with groupos
-  const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
-  const cachedUser = platformUsers.get(user.id);
+const buildCompleteUserFromCacheOrDb = async (context, user, userToLoad, cachedUsers) => {
+  const cachedUser = cachedUsers.get(userToLoad.id);
   let completeUser;
   if (cachedUser) {
     // in case we need to resolve user effective confidence level on edit (cache not updated with user edited fields yet)
     // we need groups and capabilities to compute user effective confidence level, which are accurate in cache.
     completeUser = {
-      ...user,
+      ...userToLoad,
       groups: cachedUser.groups,
       capabilities: cachedUser.capabilities,
     };
   } else { // in case we need to resolve user effective confidence level on creation.
-    completeUser = await findById(context, context.user, user.id);
+    completeUser = await findById(context, user, userToLoad.id);
   }
+  return completeUser;
+};
+
+export const batchUserEffectiveConfidenceLevel = async (context, user, batchUsers) => {
+  const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+  const completeUsers = [];
+  for (let i = 0; i < batchUsers.length; i += 1) {
+    const batchUser = batchUsers[i];
+    const completeUser = await buildCompleteUserFromCacheOrDb(context, user, batchUser, platformUsers);
+    completeUsers.push(completeUser);
+  }
+  return completeUsers.map((u) => computeUserEffectiveConfidenceLevel(u));
+};
+
+export const getUserEffectiveConfidenceLevel = async (user, context) => {
+  // we load the user from cache to have the complete user with groupos
+  const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+  const completeUser = await buildCompleteUserFromCacheOrDb(context, context.user, user, platformUsers);
   return computeUserEffectiveConfidenceLevel(completeUser);
 };

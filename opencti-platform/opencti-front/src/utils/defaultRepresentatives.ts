@@ -92,6 +92,9 @@ export const defaultKey = (n: any) => {
 // equivalent to querying representative.main
 export const getMainRepresentative = (n: any, fallback = 'Unknown') => {
   if (!n) return '';
+  if (n.name === 'Unknown') {
+    return 'Unknown';
+  }
   if (typeof n.definition === 'object') {
     return defaultValueMarking(n);
   }
@@ -110,6 +113,7 @@ export const getMainRepresentative = (n: any, fallback = 'Unknown') => {
     || n.result_name
     || n.country
     || n.key
+    || n.path
     || (n.template && n.template.name)
     || (n.content && truncate(n.content, 30))
     || (n.hashes
@@ -123,7 +127,7 @@ export const getMainRepresentative = (n: any, fallback = 'Unknown') => {
         n.target_ref_name,
         20,
       )}`)
-    || getMainRepresentative((R.head(R.pathOr([], ['objects', 'edges'], n)) as any)?.node)
+    || getMainRepresentative((R.head(n.objects?.edges ?? []) as any)?.node)
     || (n.from
       && n.to
       && `${truncate(getMainRepresentative(n.from), 20)} ➡️ ${truncate(

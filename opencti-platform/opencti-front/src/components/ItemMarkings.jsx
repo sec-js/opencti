@@ -131,9 +131,8 @@ const ItemMarkings = ({ variant, markingDefinitions, limit }) => {
         }
       }
       return (
-        <Tooltip title={withTooltip ? markingDefinition.definition : undefined}>
+        <Tooltip title={withTooltip ? markingDefinition.definition : undefined} key={markingDefinition.definition}>
           <Chip
-            key={markingDefinition.definition}
             className={className}
             style={{
               backgroundColor,
@@ -238,7 +237,7 @@ const ItemMarkings = ({ variant, markingDefinitions, limit }) => {
       title={
         <Grid container={true} spacing={3}>
           {markings.map((markingDefinition) => (
-            <Grid key={markingDefinition.id} item={true} xs={6}>
+            <Grid key={markingDefinition.id} item xs={6}>
               {renderChip(markingDefinition, { isInTooltip: true, withTooltip: true })}
             </Grid>
           ))}

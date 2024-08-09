@@ -26,6 +26,9 @@ import { useFormatter } from '../../../../components/i18n';
 import CityPopover from './CityPopover';
 import Breadcrumbs from '../../../../components/Breadcrumbs';
 import { getCurrentTab, getPaddingRight } from '../../../../utils/utils';
+import CityEdition from './CityEdition';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
 
 const subscription = graphql`
   subscription RootCitiesSubscription($id: ID!) {
@@ -84,7 +87,7 @@ const RootCityComponent = ({ queryRef, cityId }) => {
   const data = usePreloadedQuery(cityQuery, queryRef);
   const { city, connectorsForImport, connectorsForExport } = data;
   const link = `/dashboard/locations/cities/${cityId}/knowledge`;
-  const paddingRight = getPaddingRight(location.pathname, city.id, '/dashboard/locations/cities');
+  const paddingRight = getPaddingRight(location.pathname, city?.id, '/dashboard/locations/cities');
   return (
     <>
       {city ? (
@@ -127,6 +130,11 @@ const RootCityComponent = ({ queryRef, cityId }) => {
               disableSharing={true}
               stixDomainObject={city}
               PopoverComponent={<CityPopover id={city.id} />}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <CityEdition cityId={city.id} />
+                </Security>
+              )}
               enableQuickSubscription={true}
               isOpenctiAlias={true}
             />

@@ -1046,6 +1046,19 @@ input RetentionRuleAddInput {
   name: String! @constraint(minLength:2, format: "not-blank")
   filters: String!
   max_retention: Int! @constraint(min: 1)
+  scope: RetentionRuleScope!
+}
+enum RetentionRuleOrdering {
+  name
+  scope
+  remaining_count
+  last_execution_date
+  max_retention
+}
+enum RetentionRuleScope {
+  knowledge
+  file
+  workbench
 }
 type RetentionRule {
   id: ID!
@@ -1056,6 +1069,7 @@ type RetentionRule {
   last_execution_date: DateTime
   last_deleted_count: Int
   remaining_count: Int
+  scope: RetentionRuleScope!
 }
 type RetentionRuleConnection {
   pageInfo: PageInfo!
@@ -1214,6 +1228,8 @@ type Settings implements InternalObject & BasicObject {
 enum GroupsOrdering {
   name
   default_assignation
+  no_creators
+  restrict_delete
   auto_new_marking
   created_at
   updated_at
@@ -1245,6 +1261,8 @@ type Group implements InternalObject & BasicObject {
   # Group
   name: String!
   default_assignation: Boolean
+  no_creators: Boolean
+  restrict_delete: Boolean
   auto_new_marking: Boolean
   description: String
   default_dashboard: Workspace
@@ -1271,6 +1289,8 @@ input GroupAddInput {
   name: String! @constraint(minLength: 2, format: "not-blank")
   description: String
   default_assignation: Boolean
+  no_creators: Boolean
+  restrict_delete: Boolean
   auto_new_marking: Boolean
   clientMutationId: String
   group_confidence_level: ConfidenceLevelInput!
@@ -1425,11 +1445,16 @@ type User implements BasicObject & InternalObject {
   theme: String
   language: String
   external: Boolean
-  roles: [Role!]!
+  roles(
+    orderBy: RolesOrdering
+    orderMode: OrderingMode
+  ): [Role!]!
   capabilities: [Capability]!
   default_hidden_types: [String!]!
   user_confidence_level: ConfidenceLevel
   effective_confidence_level: EffectiveConfidenceLevel
+  no_creators: Boolean
+  restrict_delete: Boolean
   groups(
     orderBy: GroupsOrdering
     orderMode: OrderingMode
@@ -1476,6 +1501,8 @@ type MeUser implements BasicObject & InternalObject {
   default_hidden_types: [String]!
   user_confidence_level: ConfidenceLevel
   effective_confidence_level: EffectiveConfidenceLevel
+  no_creators: Boolean
+  restrict_delete: Boolean
   allowed_marking: [MarkingDefinition!]
   default_marking: [DefaultMarking!]
   max_shareable_marking: [MarkingDefinition!]
@@ -1689,6 +1716,25 @@ type RabbitMQConnection {
   user: String!
   pass: String!
 }
+
+input ConnectorInfoInput {
+  run_and_terminate: Boolean!
+  buffering: Boolean!
+  queue_threshold: Float!
+  queue_messages_size: Float!
+  next_run_datetime: DateTime
+  last_run_datetime: DateTime
+}
+
+type ConnectorInfo {
+  run_and_terminate: Boolean!
+  buffering: Boolean!
+  queue_threshold: Float!
+  queue_messages_size: Float!
+  next_run_datetime: DateTime
+  last_run_datetime: DateTime
+}
+
 type ConnectorConfig {
   connection: RabbitMQConnection! @auth(for: [CONNECTORAPI])
   listen: String!
@@ -1732,7 +1778,9 @@ type Connector implements BasicObject & InternalObject {
   connector_schema_ui: String
   connector_state_reset: Boolean
   connector_user_id: ID
+  connector_user: User
   connector_queue_details: ConnectorQueueDetails!
+  connector_info: ConnectorInfo
   updated_at: DateTime
   created_at: DateTime
   config: ConnectorConfig
@@ -2126,7 +2174,7 @@ enum StixCoreObjectsOrdering {
 }
 type StixCoreObjectConnection {
   pageInfo: PageInfo!
-  edges: [StixCoreObjectEdge]
+  edges: [StixCoreObjectEdge!]!
 }
 type StixCoreObjectEdge {
   cursor: String!
@@ -2272,6 +2320,7 @@ enum StixDomainObjectsOrdering {
   product
   result_name
   operatingSystem
+  x_opencti_cvss_base_severity
 }
 type StixDomainObjectConnection {
   pageInfo: PageInfo!
@@ -4121,6 +4170,7 @@ input IndividualAddInput {
   revoked: Boolean
   lang: String
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -4448,6 +4498,7 @@ input SystemAddInput {
   revoked: Boolean
   lang: String
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -4637,6 +4688,7 @@ enum IntrusionSetsOrdering {
   primary_motivation
   confidence
   _score
+  objectMarking
 }
 type IntrusionSetConnection {
   pageInfo: PageInfo!
@@ -5265,6 +5317,7 @@ input CityAddInput {
   lang: String
   x_opencti_aliases: [String]
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -5783,6 +5836,7 @@ enum ThreatActorsOrdering {
   resource_level
   _score
   threat_actor_types
+  objectMarking
 }
 type ThreatActorGroupConnection {
   pageInfo: PageInfo!
@@ -6371,6 +6425,9 @@ type Vulnerability implements BasicObject & StixObject & StixCoreObject & StixDo
   x_opencti_cvss_integrity_impact: String
   x_opencti_cvss_availability_impact: String
   x_opencti_cvss_confidentiality_impact: String
+  x_opencti_cisa_kev: Boolean
+  x_opencti_epss_score: Float
+  x_opencti_epss_percentile: Float
   softwares(first: Int, after: ID, orderBy: StixCyberObservablesOrdering, orderMode: OrderingMode): StixCyberObservableConnection
   # Technical
   creators: [Creator!]
@@ -6396,6 +6453,9 @@ input VulnerabilityAddInput {
   x_opencti_cvss_integrity_impact: String
   x_opencti_cvss_availability_impact: String
   x_opencti_cvss_confidentiality_impact: String
+  x_opencti_cisa_kev: Boolean
+  x_opencti_epss_score: Float
+  x_opencti_epss_percentile: Float
   confidence: Int
   revoked: Boolean
   lang: String
@@ -11291,7 +11351,13 @@ type Query {
   ): AttributeConnection @auth(for: [KNOWLEDGE])
   schemaAttributeNames(elementType: [String]!) : AttributeConnection @auth(for: [KNOWLEDGE, TAXIIAPI_SETCOLLECTIONS])
   retentionRule(id: String!): RetentionRule @auth(for: [SETTINGS_SETCUSTOMIZATION])
-  retentionRules(first: Int, after: ID, search: String): RetentionRuleConnection @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  retentionRules(
+    first: Int,
+    after: ID,
+    search: String,
+    orderBy: RetentionRuleOrdering
+    orderMode: OrderingMode
+  ): RetentionRuleConnection @auth(for: [SETTINGS_SETCUSTOMIZATION])
   taxiiCollection(id: String!): TaxiiCollection @auth(for: [TAXIIAPI_SETCOLLECTIONS])
   taxiiCollections(
     first: Int
@@ -11415,17 +11481,6 @@ type Query {
   stixCoreObject(id: String!): StixCoreObject @auth(for: [KNOWLEDGE])
   stixCoreObjectAnalysis(id: ID!, contentSource: String!, contentType: AnalysisContentType!): Analysis @auth(for: [KNOWLEDGE])
   stixCoreObjects(
-    first: Int
-    after: ID
-    types: [String]
-    orderBy: StixCoreObjectsOrdering
-    orderMode: OrderingMode
-    filters: FilterGroup
-    search: String
-  ): StixCoreObjectConnection @auth(for: [KNOWLEDGE])
-  stixCoreObjectsRegardingOf(
-    entityId: ID,
-    relationshipTypes: [String],
     first: Int
     after: ID
     types: [String]
@@ -12327,6 +12382,7 @@ type Query {
 ### SUBSCRIPTIONS
 
 type Subscription {
+  me: MeUser @auth
   settings(id: ID!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
   settingsMessages(id: ID!): Settings @auth
   group(id: ID!): Group @auth(for: [SETTINGS_SETACCESSES])
@@ -12797,7 +12853,7 @@ type Mutation {
   ###### INTERNAL
   deleteImport(fileName: String): ID @auth(for: [KNOWLEDGE_KNASKIMPORT])
   uploadImport(file: Upload!, fileMarkings: [String]): File @auth(for: [KNOWLEDGE_KNASKIMPORT])
-  uploadPending(file: Upload!, entityId: String, labels: [String], errorOnExisting: Boolean): File @auth(for: [KNOWLEDGE_KNASKIMPORT])
+  uploadPending(file: Upload!, entityId: String, labels: [String], errorOnExisting: Boolean, refreshEntity: Boolean): File @auth(for: [KNOWLEDGE_KNASKIMPORT])
   askJobImport(fileName: ID!, connectorId: String, configuration: String, bypassEntityId: String, bypassValidation: Boolean): File
   @auth(for: [KNOWLEDGE_KNASKIMPORT])
   resetFileIndexing: Boolean @auth(for: [SETTINGS_FILEINDEXING])
@@ -12855,7 +12911,7 @@ type Mutation {
   sessionKill(id: ID!): ID @auth(for: [SETTINGS_SETACCESSES])
   userSessionsKill(id: ID!): [ID] @auth(for: [SETTINGS_SETACCESSES])
   roleEdit(id: ID!): RoleEditMutations @auth(for: [SETTINGS_SETACCESSES])
-  pingConnector(id: ID!, state: String): Connector @auth(for: [CONNECTORAPI])
+  pingConnector(id: ID!, state: String, connectorInfo: ConnectorInfoInput): Connector @auth(for: [CONNECTORAPI])
   registerConnector(input: RegisterConnectorInput): Connector @auth(for: [CONNECTORAPI])
   resetStateConnector(id: ID!): Connector @auth(for: [MODULES_MODMANAGE])
   deleteConnector(id: ID!): ID! @auth(for: [MODULES_MODMANAGE])
@@ -12889,6 +12945,7 @@ type Mutation {
   stixCoreObjectsExportPush(entity_id: String, entity_type: String!, file: Upload!, file_markings: [String]!, listFilters: String): Boolean @auth(for: [CONNECTORAPI])
 
   ######## STIX DOMAIN OBJECT ENTITIES
+  stixBundlePush(connectorId: String!, bundle: String!): Boolean @auth(for: [CONNECTORAPI])
   stixDomainObjectAdd(input: StixDomainObjectAddInput!): StixDomainObject @auth(for: [KNOWLEDGE_KNUPDATE])
   stixDomainObjectEdit(id: ID!): StixDomainObjectEditMutations @auth
   stixDomainObjectsExportAsk(

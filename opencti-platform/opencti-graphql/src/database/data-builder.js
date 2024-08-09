@@ -102,7 +102,12 @@ export const buildEntityData = async (context, user, input, type, opts = {}) => 
       const uniqAliases = R.uniqBy((e) => normalizeName(e), preparedAliases);
       data[aliasField] = uniqAliases.filter((e) => normalizeName(e) !== normalizeName(input.name));
     }
-    data = R.assoc(INTERNAL_IDS_ALIASES, generateAliasesIdsForInstance(data), data);
+    const aliasIds = generateAliasesIdsForInstance(data);
+    data[INTERNAL_IDS_ALIASES] = aliasIds;
+    // Do not cumulate alias standard IDs in other STIX IDs
+    if (data[IDS_STIX]) {
+      data[IDS_STIX] = data[IDS_STIX].filter((id) => !aliasIds.includes(id));
+    }
   }
   // Create the meta relationships (ref, refs)
   const relToCreate = [];
@@ -112,7 +117,8 @@ export const buildEntityData = async (context, user, input, type, opts = {}) => 
     if (input[inputField] || relType === RELATION_GRANTED_TO) {
       // For organizations management
       if (relType === RELATION_GRANTED_TO && isSegregationEntity) {
-        if (isUserHasCapability(user, KNOWLEDGE_ORGANIZATION_RESTRICT) && input[inputField]) {
+        if (isUserHasCapability(user, KNOWLEDGE_ORGANIZATION_RESTRICT) && input[inputField]
+            && (!Array.isArray(input[inputField]) || input[inputField].length > 0)) {
           relToCreate.push(...buildInnerRelation(data, input[inputField], RELATION_GRANTED_TO));
         } else if (!user.inside_platform_organization) {
           // If user is not part of the platform organization, put its own organizations
@@ -263,7 +269,8 @@ export const buildRelationData = async (context, user, input, opts = {}) => {
   const relToCreate = [];
   if (isStixRelationshipExceptRef(relationshipType)) {
     // We need to link the data to organization sharing, only for core and sightings.
-    if (isUserHasCapability(user, KNOWLEDGE_ORGANIZATION_RESTRICT)) {
+    if (isUserHasCapability(user, KNOWLEDGE_ORGANIZATION_RESTRICT) && input[INPUT_GRANTED_REFS]
+        && (!Array.isArray(input[INPUT_GRANTED_REFS]) || input[INPUT_GRANTED_REFS].length > 0)) {
       relToCreate.push(...buildInnerRelation(data, input[INPUT_GRANTED_REFS], RELATION_GRANTED_TO));
     } else if (!user.inside_platform_organization) {
       // If user is not part of the platform organization, put its own organizations

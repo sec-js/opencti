@@ -2,6 +2,7 @@ import Grid from '@mui/material/Grid';
 import makeStyles from '@mui/styles/makeStyles';
 import React from 'react';
 import { graphql, useFragment } from 'react-relay';
+import useHelper from 'src/utils/hooks/useHelper';
 import StixCoreObjectOrStixCoreRelationshipNotes from '../../analyses/notes/StixCoreObjectOrStixCoreRelationshipNotes';
 import StixCoreObjectLatestHistory from '../../common/stix_core_objects/StixCoreObjectLatestHistory';
 import StixDomainObjectOverview from '../../common/stix_domain_objects/StixDomainObjectOverview';
@@ -29,6 +30,10 @@ export const taskFragment = graphql`
     description
     workflowEnabled
     revoked
+    created_at
+    updated_at
+    created
+    modified
     creators {
       id
       name
@@ -77,6 +82,8 @@ export const taskFragment = graphql`
 const TaskComponent = ({ data, enableReferences }: { data: Tasks_tasks$key, enableReferences: boolean }) => {
   const classes = useStyles();
   const task = useFragment(taskFragment, data);
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   return (
     <>
       <Grid
@@ -84,34 +91,38 @@ const TaskComponent = ({ data, enableReferences }: { data: Tasks_tasks$key, enab
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <TaskDetails tasksData={task} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview
             stixDomainObject={task}
             displayAssignees
             displayParticipants
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={task}
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={task.id} />
         </Grid>
+        <Grid item xs={12}>
+          <StixCoreObjectOrStixCoreRelationshipNotes
+            stixCoreObjectOrStixCoreRelationshipId={task.id}
+            defaultMarkings={task.objectMarking ?? []}
+          />
+        </Grid>
       </Grid>
-      <StixCoreObjectOrStixCoreRelationshipNotes
-        stixCoreObjectOrStixCoreRelationshipId={task.id}
-        defaultMarkings={task.objectMarking ?? []}
-      />
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <TaskEdition caseId={task.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <TaskEdition caseId={task.id} />
+        </Security>
+      )}
     </>
   );
 };

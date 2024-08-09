@@ -2,7 +2,7 @@ import React, { FunctionComponent, useEffect } from 'react';
 import { graphql, PreloadedQuery } from 'react-relay';
 import Paper from '@mui/material/Paper';
 import { interval } from 'rxjs';
-import { UserHistoryLinesQuery } from '@components/settings/users/__generated__/UserHistoryLinesQuery.graphql';
+import { UserHistoryLinesQuery, UserHistoryLinesQuery$variables } from '@components/settings/users/__generated__/UserHistoryLinesQuery.graphql';
 import { UserHistoryLines_data$key } from '@components/settings/users/__generated__/UserHistoryLines_data.graphql';
 import { makeStyles } from '@mui/styles';
 import { useFormatter } from '../../../../components/i18n';
@@ -17,8 +17,6 @@ const interval$ = interval(FIVE_SECONDS);
 // Do not use it for new code.
 const useStyles = makeStyles<Theme>((theme) => ({
   paper: {
-    height: '100%',
-    minHeight: '100%',
     marginTop: theme.spacing(1.5),
     padding: '10px 20px 10px 20px',
     borderRadius: 4,
@@ -72,12 +70,14 @@ const userHistoryLinesFragment = graphql`
 interface UserHistoryLinesProps {
   isRelationLog: boolean;
   queryRef: PreloadedQuery<UserHistoryLinesQuery>;
-  refetch: () => void;
+  queryArgs: UserHistoryLinesQuery$variables;
+  refetch: (args: UserHistoryLinesQuery$variables) => void;
 }
 
 const UserHistoryLines: FunctionComponent<UserHistoryLinesProps> = ({
   isRelationLog,
   queryRef,
+  queryArgs,
   refetch,
 }) => {
   const classes = useStyles();
@@ -91,24 +91,23 @@ const UserHistoryLines: FunctionComponent<UserHistoryLinesProps> = ({
     queryRef,
     nodePath: ['audits', 'pageInfo', 'globalCount'],
   });
-
   const audits = data?.audits?.edges ?? [];
-
   useEffect(() => {
     // Refresh
     const subscription = interval$.subscribe(() => {
-      refetch();
+      refetch(queryArgs);
     });
     return function cleanup() {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryArgs]);
 
   return (
     <Paper
       classes={{ root: classes.paper }}
       variant="outlined"
       style={{ marginTop: 0 }}
+      className={'paper-for-grid'}
     >
       {audits.length > 0 ? (
         audits.map((auditEdge) => {

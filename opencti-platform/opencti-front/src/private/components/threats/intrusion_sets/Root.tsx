@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// TODO Remove this when V6
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck
 import React, { useMemo, Suspense } from 'react';
 import { Route, Routes, Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { graphql, useSubscription, usePreloadedQuery, PreloadedQuery } from 'react-relay';
@@ -82,7 +78,7 @@ const intrusionSetQuery = graphql`
 
 type RootIntrusionSetProps = {
   intrusionSetId: string;
-  queryRef: PreloadedQuery<RootIntrusionSetQuery>
+  queryRef: PreloadedQuery<RootIntrusionSetQuery>;
 };
 
 const RootIntrusionSet = ({ intrusionSetId, queryRef }: RootIntrusionSetProps) => {
@@ -93,7 +89,7 @@ const RootIntrusionSet = ({ intrusionSetId, queryRef }: RootIntrusionSetProps) =
 
   const location = useLocation();
   const { t_i18n } = useFormatter();
-  useSubscription(subConfig);
+  useSubscription<RootIntrusionSetSubscription>(subConfig);
 
   const {
     intrusionSet,
@@ -158,6 +154,9 @@ const RootIntrusionSet = ({ intrusionSetId, queryRef }: RootIntrusionSetProps) =
                 borderBottom: 1,
                 borderColor: 'divider',
                 marginBottom: 4,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItem: 'center',
               }}
             >
               <Tabs
@@ -275,9 +274,9 @@ const RootIntrusionSet = ({ intrusionSetId, queryRef }: RootIntrusionSetProps) =
 };
 
 const Root = () => {
-  const { intrusionSetId } = useParams();
+  const { intrusionSetId } = useParams() as { intrusionSetId: string; };
   const queryRef = useQueryLoading<RootIntrusionSetQuery>(intrusionSetQuery, {
-    id: intrusionSetId ?? '',
+    id: intrusionSetId,
   });
 
   return (

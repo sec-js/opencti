@@ -14,7 +14,9 @@ import {
   authenticateUser,
   batchCreator,
   batchRolesForUsers,
+  batchUserEffectiveConfidenceLevel,
   bookmarks,
+  buildCompleteUser,
   deleteBookmark,
   findAll,
   findAllMembers,
@@ -52,7 +54,7 @@ import {
   userRenewToken,
   userWithOrigin
 } from '../domain/user';
-import { subscribeToInstanceEvents } from '../graphql/subscriptionWrapper';
+import { subscribeToInstanceEvents, subscribeToUserEvents } from '../graphql/subscriptionWrapper';
 import { publishUserAction } from '../listener/UserActionListener';
 import { findById as findWorskpaceById } from '../modules/workspace/workspace-domain';
 import { ENTITY_TYPE_USER } from '../schema/internalObject';
@@ -60,6 +62,7 @@ import { executionContext, REDACTED_USER } from '../utils/access';
 import { getNotifiers } from '../modules/notifier/notifier-domain';
 
 const rolesUsersLoader = batchLoader(batchRolesForUsers);
+const usersConfidenceLoader = batchLoader(batchUserEffectiveConfidenceLevel);
 const creatorLoader = batchLoader(batchCreator);
 
 const userResolvers = {
@@ -84,7 +87,7 @@ const userResolvers = {
     objectOrganization: (current, args, context) => userOrganizationsPaginated(context, context.user, current.id, args),
     editContext: (current) => fetchEditContext(current.id),
     sessions: (current) => findUserSessions(current.id),
-    effective_confidence_level: (current, args, context) => getUserEffectiveConfidenceLevel(current, context),
+    effective_confidence_level: (current, args, context) => usersConfidenceLoader.load(current, context, context.user),
     personal_notifiers: (current, _, context) => getNotifiers(context, context.user, current.personal_notifiers),
   },
   Member: {
@@ -239,6 +242,15 @@ const userResolvers = {
     bookmarkDelete: (_, { id }, context) => deleteBookmark(context, context.user, id),
   },
   Subscription: {
+    me: {
+      resolve: /* v8 ignore next */ (payload, _, context) => {
+        return buildCompleteUser(context, payload.instance);
+      },
+      subscribe: /* v8 ignore next */ (_, __, context) => {
+        const bus = BUS_TOPICS[ENTITY_TYPE_USER];
+        return subscribeToUserEvents(context, [bus.EDIT_TOPIC]);
+      },
+    },
     user: {
       resolve: /* v8 ignore next */ (payload) => payload.instance,
       subscribe: /* v8 ignore next */ (_, { id }, context) => {

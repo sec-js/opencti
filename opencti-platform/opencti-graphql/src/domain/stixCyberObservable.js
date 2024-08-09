@@ -194,6 +194,11 @@ export const addStixCyberObservable = async (context, user, input) => {
   if (!input[graphQLType]) {
     throw FunctionalError(`Expecting variable ${graphQLType} in the input, got nothing.`);
   }
+  const lowerCaseTypes = ['Domain-Name', 'Email-Addr'];
+  if (lowerCaseTypes.includes(type) && input[graphQLType].value) {
+    // eslint-disable-next-line no-param-reassign
+    input[graphQLType].value = input[graphQLType].value.toLowerCase();
+  }
   if (type === 'Artifact' && input[graphQLType].file && isEmptyField(payload_bin)) {
     return artifactImport(context, user, { ...input, ...input[graphQLType] });
   }
@@ -408,15 +413,15 @@ export const artifactImport = async (context, user, args) => {
 };
 
 export const indicatorsPaginated = async (context, user, stixCyberObservableId, args) => {
-  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_BASED_ON, ENTITY_TYPE_INDICATOR, true, false, args);
+  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_BASED_ON, ENTITY_TYPE_INDICATOR, true, args);
 };
 
 export const vulnerabilitiesPaginated = async (context, user, stixCyberObservableId, args) => {
-  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_HAS, ENTITY_TYPE_VULNERABILITY, false, false, args);
+  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_HAS, ENTITY_TYPE_VULNERABILITY, false, args);
 };
 
 export const serviceDllsPaginated = async (context, user, stixCyberObservableId, args) => {
-  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_SERVICE_DLL, ENTITY_HASHED_OBSERVABLE_STIX_FILE, false, false, args);
+  return listEntitiesThroughRelationsPaginated(context, user, stixCyberObservableId, RELATION_SERVICE_DLL, ENTITY_HASHED_OBSERVABLE_STIX_FILE, false, args);
 };
 
 export const stixFileObsArtifact = async (context, user, stixCyberObservableId) => {

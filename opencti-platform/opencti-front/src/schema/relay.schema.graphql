@@ -1092,6 +1092,21 @@ input RetentionRuleAddInput {
   name: String!
   filters: String!
   max_retention: Int!
+  scope: RetentionRuleScope!
+}
+
+enum RetentionRuleOrdering {
+  name
+  scope
+  remaining_count
+  last_execution_date
+  max_retention
+}
+
+enum RetentionRuleScope {
+  knowledge
+  file
+  workbench
 }
 
 type RetentionRule {
@@ -1103,6 +1118,7 @@ type RetentionRule {
   last_execution_date: DateTime
   last_deleted_count: Int
   remaining_count: Int
+  scope: RetentionRuleScope!
 }
 
 type RetentionRuleConnection {
@@ -1265,6 +1281,8 @@ type Settings implements InternalObject & BasicObject {
 enum GroupsOrdering {
   name
   default_assignation
+  no_creators
+  restrict_delete
   auto_new_marking
   created_at
   updated_at
@@ -1299,6 +1317,8 @@ type Group implements InternalObject & BasicObject {
   parent_types: [String]!
   name: String!
   default_assignation: Boolean
+  no_creators: Boolean
+  restrict_delete: Boolean
   auto_new_marking: Boolean
   description: String
   default_dashboard: Workspace
@@ -1319,6 +1339,8 @@ input GroupAddInput {
   name: String!
   description: String
   default_assignation: Boolean
+  no_creators: Boolean
+  restrict_delete: Boolean
   auto_new_marking: Boolean
   clientMutationId: String
   group_confidence_level: ConfidenceLevelInput!
@@ -1491,11 +1513,13 @@ type User implements BasicObject & InternalObject {
   theme: String
   language: String
   external: Boolean
-  roles: [Role!]!
+  roles(orderBy: RolesOrdering, orderMode: OrderingMode): [Role!]!
   capabilities: [Capability]!
   default_hidden_types: [String!]!
   user_confidence_level: ConfidenceLevel
   effective_confidence_level: EffectiveConfidenceLevel
+  no_creators: Boolean
+  restrict_delete: Boolean
   groups(orderBy: GroupsOrdering, orderMode: OrderingMode): GroupConnection
   objectOrganization(orderBy: OrganizationsOrdering, orderMode: OrderingMode): OrganizationConnection
   created_at: DateTime!
@@ -1535,6 +1559,8 @@ type MeUser implements BasicObject & InternalObject {
   default_hidden_types: [String]!
   user_confidence_level: ConfidenceLevel
   effective_confidence_level: EffectiveConfidenceLevel
+  no_creators: Boolean
+  restrict_delete: Boolean
   allowed_marking: [MarkingDefinition!]
   default_marking: [DefaultMarking!]
   max_shareable_marking: [MarkingDefinition!]
@@ -1750,6 +1776,24 @@ type RabbitMQConnection {
   pass: String!
 }
 
+input ConnectorInfoInput {
+  run_and_terminate: Boolean!
+  buffering: Boolean!
+  queue_threshold: Float!
+  queue_messages_size: Float!
+  next_run_datetime: DateTime
+  last_run_datetime: DateTime
+}
+
+type ConnectorInfo {
+  run_and_terminate: Boolean!
+  buffering: Boolean!
+  queue_threshold: Float!
+  queue_messages_size: Float!
+  next_run_datetime: DateTime
+  last_run_datetime: DateTime
+}
+
 type ConnectorConfig {
   connection: RabbitMQConnection!
   listen: String!
@@ -1793,7 +1837,9 @@ type Connector implements BasicObject & InternalObject {
   connector_schema_ui: String
   connector_state_reset: Boolean
   connector_user_id: ID
+  connector_user: User
   connector_queue_details: ConnectorQueueDetails!
+  connector_info: ConnectorInfo
   updated_at: DateTime
   created_at: DateTime
   config: ConnectorConfig
@@ -2175,7 +2221,7 @@ enum StixCoreObjectsOrdering {
 
 type StixCoreObjectConnection {
   pageInfo: PageInfo!
-  edges: [StixCoreObjectEdge]
+  edges: [StixCoreObjectEdge!]!
 }
 
 type StixCoreObjectEdge {
@@ -2265,6 +2311,7 @@ enum StixDomainObjectsOrdering {
   product
   result_name
   operatingSystem
+  x_opencti_cvss_base_severity
 }
 
 type StixDomainObjectConnection {
@@ -3399,6 +3446,7 @@ input IndividualAddInput {
   revoked: Boolean
   lang: String
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -3610,6 +3658,7 @@ input SystemAddInput {
   revoked: Boolean
   lang: String
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -3741,6 +3790,7 @@ enum IntrusionSetsOrdering {
   primary_motivation
   confidence
   _score
+  objectMarking
 }
 
 type IntrusionSetConnection {
@@ -4141,6 +4191,7 @@ input CityAddInput {
   lang: String
   x_opencti_aliases: [String]
   createdBy: String
+  objectOrganization: [String]
   objectMarking: [String]
   objectLabel: [String]
   externalReferences: [String]
@@ -4486,6 +4537,7 @@ enum ThreatActorsOrdering {
   resource_level
   _score
   threat_actor_types
+  objectMarking
 }
 
 type ThreatActorGroupConnection {
@@ -4841,6 +4893,9 @@ type Vulnerability implements BasicObject & StixObject & StixCoreObject & StixDo
   x_opencti_cvss_integrity_impact: String
   x_opencti_cvss_availability_impact: String
   x_opencti_cvss_confidentiality_impact: String
+  x_opencti_cisa_kev: Boolean
+  x_opencti_epss_score: Float
+  x_opencti_epss_percentile: Float
   softwares(first: Int, after: ID, orderBy: StixCyberObservablesOrdering, orderMode: OrderingMode): StixCyberObservableConnection
   creators: [Creator!]
   toStix: String
@@ -4866,6 +4921,9 @@ input VulnerabilityAddInput {
   x_opencti_cvss_integrity_impact: String
   x_opencti_cvss_availability_impact: String
   x_opencti_cvss_confidentiality_impact: String
+  x_opencti_cisa_kev: Boolean
+  x_opencti_epss_score: Float
+  x_opencti_epss_percentile: Float
   confidence: Int
   revoked: Boolean
   lang: String
@@ -7411,7 +7469,7 @@ type Query {
   runtimeAttributes(first: Int, search: String, orderMode: OrderingMode, attributeName: String!): AttributeConnection
   schemaAttributeNames(elementType: [String]!): AttributeConnection
   retentionRule(id: String!): RetentionRule
-  retentionRules(first: Int, after: ID, search: String): RetentionRuleConnection
+  retentionRules(first: Int, after: ID, search: String, orderBy: RetentionRuleOrdering, orderMode: OrderingMode): RetentionRuleConnection
   taxiiCollection(id: String!): TaxiiCollection
   taxiiCollections(first: Int, after: ID, orderBy: TaxiiCollectionOrdering, orderMode: OrderingMode, search: String, filters: FilterGroup): TaxiiCollectionConnection
   streamCollection(id: String!): StreamCollection
@@ -7444,7 +7502,6 @@ type Query {
   stixCoreObject(id: String!): StixCoreObject
   stixCoreObjectAnalysis(id: ID!, contentSource: String!, contentType: AnalysisContentType!): Analysis
   stixCoreObjects(first: Int, after: ID, types: [String], orderBy: StixCoreObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): StixCoreObjectConnection
-  stixCoreObjectsRegardingOf(entityId: ID, relationshipTypes: [String], first: Int, after: ID, types: [String], orderBy: StixCoreObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup, search: String): StixCoreObjectConnection
   globalSearch(first: Int, after: ID, search: String, types: [String], orderBy: StixCoreObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup): StixCoreObjectConnection
   stixCoreObjectsExportFiles(first: Int, exportContext: ExportContext!): FileConnection
   stixCoreObjectsTimeSeries(authorId: String, field: String!, operation: StatsOperation!, startDate: DateTime!, endDate: DateTime, interval: String!, onlyInferred: Boolean, types: [String], filters: FilterGroup, search: String): [TimeSeries]
@@ -7680,6 +7737,7 @@ type Query {
 }
 
 type Subscription {
+  me: MeUser
   settings(id: ID!): Settings
   settingsMessages(id: ID!): Settings
   group(id: ID!): Group
@@ -8156,7 +8214,7 @@ type StixRefRelationshipEditMutations {
 type Mutation {
   deleteImport(fileName: String): ID
   uploadImport(file: Upload!, fileMarkings: [String]): File
-  uploadPending(file: Upload!, entityId: String, labels: [String], errorOnExisting: Boolean): File
+  uploadPending(file: Upload!, entityId: String, labels: [String], errorOnExisting: Boolean, refreshEntity: Boolean): File
   askJobImport(fileName: ID!, connectorId: String, configuration: String, bypassEntityId: String, bypassValidation: Boolean): File
   resetFileIndexing: Boolean
   synchronizerAdd(input: SynchronizerAddInput!): Synchronizer
@@ -8201,7 +8259,7 @@ type Mutation {
   sessionKill(id: ID!): ID
   userSessionsKill(id: ID!): [ID]
   roleEdit(id: ID!): RoleEditMutations
-  pingConnector(id: ID!, state: String): Connector
+  pingConnector(id: ID!, state: String, connectorInfo: ConnectorInfoInput): Connector
   registerConnector(input: RegisterConnectorInput): Connector
   resetStateConnector(id: ID!): Connector
   deleteConnector(id: ID!): ID!
@@ -8225,6 +8283,7 @@ type Mutation {
   stixCoreObjectEdit(id: ID!): StixCoreObjectEditMutations
   stixCoreObjectsExportAsk(input: StixCoreObjectsExportAskInput!): [File!]
   stixCoreObjectsExportPush(entity_id: String, entity_type: String!, file: Upload!, file_markings: [String]!, listFilters: String): Boolean
+  stixBundlePush(connectorId: String!, bundle: String!): Boolean
   stixDomainObjectAdd(input: StixDomainObjectAddInput!): StixDomainObject
   stixDomainObjectEdit(id: ID!): StixDomainObjectEditMutations
   stixDomainObjectsExportAsk(format: String!, exportType: String!, contentMaxMarkings: [String], fileMarkings: [String], search: String, exportContext: ExportContext, relationship_type: [String], orderBy: StixDomainObjectsOrdering, orderMode: OrderingMode, filters: FilterGroup, selectedIds: [String]): [File!]
@@ -8382,6 +8441,7 @@ type Mutation {
   caseTemplateRelationDelete(id: ID!, toId: StixRef!, relationship_type: String!): CaseTemplate
   caseIncidentAdd(input: CaseIncidentAddInput!): CaseIncident
   caseIncidentDelete(id: ID!): ID
+  caseIncidentEditAuthorizedMembers(id: ID!, input: [MemberAccessInput!]): CaseIncident
   caseRfiAdd(input: CaseRfiAddInput!): CaseRfi
   caseRfiDelete(id: ID!): ID
   caseRftAdd(input: CaseRftAddInput!): CaseRft
@@ -8962,7 +9022,7 @@ enum NarrativesOrdering {
 
 type NarrativeConnection {
   pageInfo: PageInfo!
-  edges: [NarrativeEdge]
+  edges: [NarrativeEdge!]!
 }
 
 type NarrativeEdge {
@@ -9760,6 +9820,8 @@ interface Case implements BasicObject & StixObject & StixCoreObject & StixDomain
   content: String
   content_mapping: String
   tasks: TaskConnection!
+  authorized_members: [MemberAccess!]
+  currentUserAccessRight: String
 }
 
 enum CasesOrdering {
@@ -9878,6 +9940,8 @@ type CaseIncident implements BasicObject & StixObject & StixCoreObject & StixDom
   content: String
   content_mapping: String
   tasks: TaskConnection!
+  authorized_members: [MemberAccess!]
+  currentUserAccessRight: String
   rating: Int
   response_types: [String!]
   severity: String
@@ -9997,6 +10061,8 @@ type CaseRfi implements BasicObject & StixObject & StixCoreObject & StixDomainOb
   content: String
   content_mapping: String
   tasks: TaskConnection!
+  authorized_members: [MemberAccess!]
+  currentUserAccessRight: String
   information_types: [String!]
   severity: String
   priority: String
@@ -10114,6 +10180,8 @@ type CaseRft implements BasicObject & StixObject & StixCoreObject & StixDomainOb
   content: String
   content_mapping: String
   tasks: TaskConnection!
+  authorized_members: [MemberAccess!]
+  currentUserAccessRight: String
   takedown_types: [String!]
   severity: String
   priority: String
@@ -10317,6 +10385,12 @@ type DefaultValueAttribute {
   defaultValues: [DefaultValue!]!
 }
 
+type OverviewLayoutCustomization {
+  key: String!
+  width: Int!
+  label: String!
+}
+
 type EntitySetting implements InternalObject & BasicObject {
   id: ID!
   entity_type: String!
@@ -10334,6 +10408,7 @@ type EntitySetting implements InternalObject & BasicObject {
   availableSettings: [String!]!
   created_at: DateTime!
   updated_at: DateTime!
+  overview_layout_customization: [OverviewLayoutCustomization!]
 }
 
 enum EntitySettingsOrdering {
@@ -10714,6 +10789,8 @@ enum ThreatActorsIndividualOrdering {
   resource_level
   confidence
   _score
+  objectMarking
+  threat_actor_types
 }
 
 type ThreatActorIndividualConnection {
@@ -10913,7 +10990,7 @@ enum TaxiiVersion {
   v21
 }
 
-enum TaxiiAuthType {
+enum IngestionAuthType {
   none
   basic
   bearer
@@ -10932,13 +11009,14 @@ type IngestionTaxii implements InternalObject & BasicObject {
   uri: String!
   collection: String!
   version: TaxiiVersion!
-  authentication_type: TaxiiAuthType!
+  authentication_type: IngestionAuthType!
   authentication_value: String
   user_id: String
   user: Creator
   current_state_cursor: String
   added_after_start: DateTime
   ingestion_running: Boolean
+  last_execution_date: DateTime
 }
 
 enum IngestionTaxiiOrdering {
@@ -10964,20 +11042,13 @@ input IngestionTaxiiAddInput {
   name: String!
   description: String
   version: TaxiiVersion!
-  authentication_type: TaxiiAuthType!
+  authentication_type: IngestionAuthType!
   authentication_value: String
   uri: String!
   collection: String!
   added_after_start: DateTime
   ingestion_running: Boolean
   user_id: String
-}
-
-enum CsvAuthType {
-  none
-  basic
-  bearer
-  certificate
 }
 
 type IngestionCsv implements InternalObject & BasicObject {
@@ -10991,7 +11062,7 @@ type IngestionCsv implements InternalObject & BasicObject {
   description: String
   uri: String!
   csvMapper: CsvMapper!
-  authentication_type: CsvAuthType!
+  authentication_type: IngestionAuthType!
   authentication_value: String
   user_id: String!
   user: Creator
@@ -11023,7 +11094,7 @@ type IngestionCsvEdge {
 input IngestionCsvAddInput {
   name: String!
   description: String
-  authentication_type: CsvAuthType!
+  authentication_type: IngestionAuthType!
   authentication_value: String
   current_state_date: DateTime
   uri: String!

@@ -1,6 +1,10 @@
 /* eslint-disable no-underscore-dangle */
+import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { getDefaultRoleAssumerWithWebIdentity } from '@aws-sdk/client-sts';
 import { Client as ElkClient } from '@elastic/elasticsearch';
 import { Client as OpenClient } from '@opensearch-project/opensearch';
+/* eslint-disable import/no-unresolved */
+import { AwsSigv4Signer } from '@opensearch-project/opensearch/aws';
 import { Promise as BluePromise } from 'bluebird';
 import * as R from 'ramda';
 import semver from 'semver';
@@ -84,9 +88,19 @@ import {
 } from '../schema/stixDomainObject';
 import { isBasicObject, isStixCoreObject, isStixObject } from '../schema/stixCoreObject';
 import { isBasicRelationship, isStixRelationship } from '../schema/stixRelationship';
-import { isStixCoreRelationship, RELATION_INDICATES, STIX_CORE_RELATIONSHIPS } from '../schema/stixCoreRelationship';
+import { isStixCoreRelationship, RELATION_INDICATES, RELATION_PUBLISHES, STIX_CORE_RELATIONSHIPS } from '../schema/stixCoreRelationship';
 import { INTERNAL_FROM_FIELD, INTERNAL_TO_FIELD } from '../schema/identifier';
-import { BYPASS, computeUserMemberAccessIds, executionContext, INTERNAL_USERS, isBypassUser, MEMBER_ACCESS_ALL, SYSTEM_USER, userFilterStoreElements } from '../utils/access';
+import {
+  BYPASS,
+  computeUserMemberAccessIds,
+  controlUserRestrictDeleteAgainstElement,
+  executionContext,
+  INTERNAL_USERS,
+  isBypassUser,
+  MEMBER_ACCESS_ALL,
+  SYSTEM_USER,
+  userFilterStoreElements
+} from '../utils/access';
 import { isSingleRelationsRef, } from '../schema/stixEmbeddedRelationship';
 import { now, runtimeFieldObservableValueScript } from '../utils/format';
 import { ENTITY_TYPE_KILL_CHAIN_PHASE, ENTITY_TYPE_MARKING_DEFINITION, isStixMetaObject } from '../schema/stixMetaObject';
@@ -189,6 +203,7 @@ export const UNIMPACTED_ENTITIES_ROLE = [
   `${RELATION_GRANTED_TO}_${ROLE_TO}`,
   `${RELATION_OBJECT_LABEL}_${ROLE_TO}`,
   `${RELATION_KILL_CHAIN_PHASE}_${ROLE_TO}`,
+  `${RELATION_PUBLISHES}_${ROLE_FROM}`,
   // RELATION_OBJECT
   // RELATION_EXTERNAL_REFERENCE
   `${RELATION_INDICATES}_${ROLE_TO}`,
@@ -244,6 +259,7 @@ export const searchEngineInit = async () => {
   const ca = conf.get('elasticsearch:ssl:ca')
     ? loadCert(conf.get('elasticsearch:ssl:ca'))
     : conf.get('elasticsearch:ssl:ca_plain') || null;
+  const region = conf.get('opensearch:region');
   const searchConfiguration = {
     node: conf.get('elasticsearch:url'),
     proxy: conf.get('elasticsearch:proxy') || null,
@@ -263,6 +279,16 @@ export const searchEngineInit = async () => {
       ca,
       rejectUnauthorized: booleanConf('elasticsearch:ssl:reject_unauthorized', true),
     },
+    ...(region ? AwsSigv4Signer({
+      region,
+      service: conf.get('opensearch:service') || 'es',
+      getCredentials: () => {
+        const credentialsProvider = defaultProvider({
+          roleAssumerWithWebIdentity: getDefaultRoleAssumerWithWebIdentity({ region })
+        });
+        return credentialsProvider();
+      }
+    }) : {})
   };
   searchConfiguration.auth = await enrichWithRemoteCredentials('elasticsearch', searchConfiguration.auth);
   // Select the correct engine
@@ -472,6 +498,8 @@ export const buildDataRestrictions = async (context, user, opts = {}) => {
           should.push({ match: { 'internal_id.keyword': user.individual_id } });
           should.push({ match: { [buildRefRelationSearchKey(RELATION_CREATED_BY)]: user.individual_id } });
         }
+        // For tasks
+        should.push({ match: { 'initiator_id.keyword': user.internal_id } });
         // Finally build the bool should search
         must.push({ bool: { should, minimum_should_match: 1 } });
       }
@@ -490,6 +518,8 @@ export const buildDataRestrictions = async (context, user, opts = {}) => {
         should.push({ match: { 'internal_id.keyword': user.individual_id } });
         should.push({ match: { [buildRefRelationSearchKey(RELATION_CREATED_BY)]: user.individual_id } });
       }
+      // For tasks
+      should.push({ match: { 'initiator_id.keyword': user.internal_id } });
       // Finally build the bool should search
       must.push({ bool: { should, minimum_should_match: 1 } });
     }
@@ -1652,15 +1682,20 @@ const buildLocalMustFilter = async (validFilter) => {
   const valuesFiltering = [];
   const noValuesFiltering = [];
   const { key, values, nested, operator = 'eq', mode: localFilterMode = 'or' } = validFilter;
+  if (isEmptyField(key)) {
+    throw FunctionalError('A filter key must be defined', { key });
+  }
   const arrayKeys = Array.isArray(key) ? key : [key];
+  const headKey = R.head(arrayKeys);
+  const dontHandleMultipleKeys = nested || operator === 'nil' || operator === 'not_nil';
+  if (dontHandleMultipleKeys && arrayKeys.length > 1) {
+    throw UnsupportedError('Filter must have only one field', { keys: arrayKeys, operator });
+  }
   // 01. Handle nested filters
   // TODO IF KEY is PART OF Rule we need to add extra fields search
   // TODO Add connections like filters to have native fromId, toId filters handling.
   // See opencti-front\src\private\components\events\StixSightingRelationships.tsx
   if (nested) {
-    if (arrayKeys.length > 1) {
-      throw UnsupportedError('Filter must have only one field', { keys: arrayKeys });
-    }
     const nestedMust = [];
     const nestedMustNot = [];
     for (let nestIndex = 0; nestIndex < nested.length; nestIndex += 1) {
@@ -1735,7 +1770,7 @@ const buildLocalMustFilter = async (validFilter) => {
       nestedMust.push(should);
     }
     const nestedQuery = {
-      path: R.head(arrayKeys),
+      path: headKey,
       query: {
         bool: {
           must: nestedMust,
@@ -1747,48 +1782,127 @@ const buildLocalMustFilter = async (validFilter) => {
   }
   // 02. Handle nil and not_nil operators
   if (operator === 'nil') {
-    if (arrayKeys.length > 1) {
-      throw UnsupportedError('Filter must have only one field', { keys: arrayKeys });
-    } else {
-      const schemaKey = schemaAttributesDefinition.getAttributeByName(R.head(arrayKeys));
-      valuesFiltering.push(schemaKey?.type === 'string' && schemaKey?.format === 'text' ? {
-        bool: {
-          must_not: {
-            wildcard: {
-              [R.head(arrayKeys)]: '*'
-            }
-          },
-        }
-      } : {
-        bool: {
-          must_not: {
-            exists: {
-              field: R.head(arrayKeys)
-            }
+    const filterDefinition = schemaAttributesDefinition.getAttributeByName(headKey);
+    let valueFiltering = { // classic filters: field doesn't exist
+      bool: {
+        must_not: {
+          exists: {
+            field: headKey
           }
         }
-      });
-    }
-  } else if (operator === 'not_nil') {
-    if (arrayKeys.length > 1) {
-      throw UnsupportedError('Filter must have only one field', { keys: arrayKeys });
-    } else {
-      const schemaKey = schemaAttributesDefinition.getAttributeByName(R.head(arrayKeys));
-      valuesFiltering.push(schemaKey?.type === 'string' && schemaKey?.format === 'text' ? {
-        bool: {
-          must:
-            {
+      }
+    };
+    if (filterDefinition?.type === 'string') {
+      if (filterDefinition?.format === 'text') { // text filters: use wildcard
+        valueFiltering = {
+          bool: {
+            must_not: {
               wildcard: {
-                [R.head(arrayKeys)]: '*'
+                [headKey]: '*'
               }
             },
+          }
+        };
+      } else { // string filters: nil <-> (field doesn't exist) OR (field = empty string)
+        valueFiltering = {
+          bool: {
+            should: [
+              {
+                bool: {
+                  must_not: {
+                    exists: {
+                      field: headKey
+                    }
+                  }
+                }
+              },
+              {
+                term: {
+                  [headKey === '_id' ? headKey : `${headKey}.keyword`]: { value: '' },
+                },
+              },
+            ],
+            minimum_should_match: 1,
+          }
+        };
+      }
+    } else if (filterDefinition?.type === 'date') { // date filters: nil <-> (field doesn't exist) OR (date <= epoch) OR (date >= 5138)
+      valueFiltering = {
+        bool: {
+          should: [
+            {
+              bool: {
+                must_not: {
+                  exists: {
+                    field: headKey
+                  }
+                }
+              }
+            },
+            { range: { [headKey]: { lte: '1970-01-01T01:00:00.000Z' } } },
+            { range: { [headKey]: { gte: '5138-11-16T09:46:40.000Z' } } }
+          ],
+          minimum_should_match: 1,
         }
-      } : {
-        exists: {
-          field: R.head(arrayKeys)
-        }
-      });
+      };
     }
+    valuesFiltering.push(valueFiltering);
+  } else if (operator === 'not_nil') {
+    const filterDefinition = schemaAttributesDefinition.getAttributeByName(headKey);
+    let valueFiltering = { // classic filters: field exists
+      exists: {
+        field: headKey
+      }
+    };
+    if (filterDefinition?.type === 'string') {
+      if (filterDefinition?.format === 'text') { // text filters: use wildcard
+        valueFiltering = {
+          bool: {
+            must: {
+              wildcard: {
+                [headKey]: '*'
+              }
+            },
+          }
+        };
+      } else { // other filters: not_nil <-> (field exists) AND (field != empty string)
+        valueFiltering = {
+          bool: {
+            must: [
+              {
+                exists: {
+                  field: headKey
+                }
+              },
+              {
+                bool: {
+                  must_not: {
+                    term: {
+                      [headKey === '_id' ? headKey : `${headKey}.keyword`]: { value: '' },
+                    },
+                  },
+                }
+              }
+            ],
+          }
+        };
+      }
+    } else if (filterDefinition?.type === 'date') { // date filters: not_nil <-> (field exists) AND (date > epoch) AND (date < 5138)
+      valueFiltering = {
+        bool: {
+          must: [
+            {
+              exists: {
+                field: headKey
+              }
+            },
+            { range: { [headKey]: { gt: '1970-01-01T01:00:00.000Z' } } },
+            { range: { [headKey]: { lt: '5138-11-16T09:46:40.000Z' } } }
+          ],
+        }
+      };
+    }
+    valuesFiltering.push(valueFiltering);
   }
   // 03. Handle values according to the operator
   if (operator !== 'nil' && operator !== 'not_nil') {
@@ -1797,7 +1911,7 @@ const buildLocalMustFilter = async (validFilter) => {
         if (arrayKeys.length > 1) {
           throw UnsupportedError('Filter must have only one field', { keys: arrayKeys });
         }
-        valuesFiltering.push({ exists: { field: R.head(arrayKeys) } });
+        valuesFiltering.push({ exists: { field: headKey } });
       } else if (operator === 'eq' || operator === 'not_eq') {
         const targets = operator === 'eq' ? valuesFiltering : noValuesFiltering;
         targets.push({
@@ -1869,7 +1983,7 @@ const buildLocalMustFilter = async (validFilter) => {
         if (arrayKeys.length > 1) {
           throw UnsupportedError('Filter must have only one field', { keys: arrayKeys });
         }
-        valuesFiltering.push({ range: { [R.head(arrayKeys)]: { [operator]: values[i] } } });
+        valuesFiltering.push({ range: { [headKey]: { [operator]: values[i] } } }); // range operators
       }
     }
   }
@@ -2475,7 +2589,16 @@ const completeSpecialFilterKeys = async (context, user, inputFilters) => {
         finalFilters.push({ key: 'connections', nested, mode: filter.mode });
       }
       if (filterKey === ALIAS_FILTER) {
-        finalFilters.push({ ...filter, key: [ATTRIBUTE_ALIASES, ATTRIBUTE_ALIASES_OPENCTI] });
+        finalFilterGroups.push({
+          mode: filter.operator === 'nil' || (filter.operator.startsWith('not_') && filter.operator !== 'not_nil')
+            ? 'and'
+            : 'or',
+          filters: [
+            { ...filter, key: [ATTRIBUTE_ALIASES] },
+            { ...filter, key: [ATTRIBUTE_ALIASES_OPENCTI] },
+          ],
+          filterGroups: [],
+        });
       }
     } else if (arrayKeys.some((filterKey) => isObjectAttribute(filterKey)) && !arrayKeys.some((filterKey) => filterKey === 'connections')) {
       if (arrayKeys.length > 1) {
@@ -2511,7 +2634,8 @@ const completeSpecialFilterKeys = async (context, user, inputFilters) => {
 
 const elQueryBodyBuilder = async (context, user, options) => {
   // eslint-disable-next-line no-use-before-define
-  const { ids = [], first = ES_DEFAULT_PAGINATION, after, orderBy = null, orderMode = 'asc', noSize = false, noSort = false, intervalInclude = false } = options;
+  const { ids = [], after, orderBy = null, orderMode = 'asc', noSize = false, noSort = false, intervalInclude = false } = options;
+  const first = options.first ?? ES_DEFAULT_PAGINATION;
   const { types = null, search = null } = options;
   const filters = checkAndConvertFilters(options.filters, { noFiltersChecking: options.noFiltersChecking });
   const { startDate = null, endDate = null, dateAttribute = null } = options;
@@ -2908,7 +3032,8 @@ export const elAggregationsList = async (context, user, indexName, aggregations,
 
 export const elPaginate = async (context, user, indexName, options = {}) => {
   // eslint-disable-next-line no-use-before-define
-  const { baseData = false, baseFields = BASE_FIELDS, bypassSizeLimit = false, first = ES_DEFAULT_PAGINATION } = options;
+  const { baseData = false, baseFields = BASE_FIELDS, bypassSizeLimit = false } = options;
+  const first = options.first ?? ES_DEFAULT_PAGINATION;
   const { types = null, connectionFormat = true } = options;
   const body = await elQueryBodyBuilder(context, user, options);
   if (body.size > ES_MAX_PAGINATION && !bypassSizeLimit) {
@@ -2935,7 +3060,8 @@ export const elPaginate = async (context, user, indexName, options = {}) => {
     );
 };
 export const elList = async (context, user, indexName, opts = {}) => {
-  const { first = ES_DEFAULT_PAGINATION, maxSize = undefined } = opts;
+  const { maxSize = undefined } = opts;
+  const first = opts.first ?? ES_DEFAULT_PAGINATION;
   let emitSize = 0;
   let hasNextPage = true;
   let continueProcess = true;
@@ -2955,7 +3081,7 @@ export const elList = async (context, user, indexName, opts = {}) => {
     const paginateOpts = { ...opts, first, after: searchAfter, connectionFormat: false };
     const elements = await elPaginate(context, user, indexName, paginateOpts);
     emitSize += elements.length;
-    const noMoreElements = elements.length === 0 || elements.length < (first ?? ES_DEFAULT_PAGINATION);
+    const noMoreElements = elements.length === 0 || elements.length < first;
     const moreThanMax = maxSize ? emitSize >= maxSize : false;
     if (noMoreElements || moreThanMax) {
       if (elements.length > 0) {
@@ -2984,7 +3110,8 @@ export const elLoadBy = async (context, user, field, value, type = null, indices
   return R.head(hits);
 };
 export const elAttributeValues = async (context, user, field, opts = {}) => {
-  const { first, orderMode = 'asc', search } = opts;
+  const { orderMode = 'asc', search } = opts;
+  const first = opts.first ?? ES_DEFAULT_PAGINATION;
   const markingRestrictions = await buildDataRestrictions(context, user);
   const must = [];
   if (isNotEmptyField(search) && search.length > 0) {
@@ -3009,7 +3136,7 @@ export const elAttributeValues = async (context, user, field, opts = {}) => {
       values: {
         terms: {
           field: buildFieldForQuery(field),
-          size: first ?? ES_DEFAULT_PAGINATION,
+          size: first,
           order: { _key: orderMode },
         },
       },
@@ -3259,7 +3386,7 @@ export const elReindexElements = async (context, user, ids, sourceIndex, destInd
         index: destIndex
       },
       script: { // remove old fields that are not mapped anymore but can be present in DB
-        source: "ctx._source.remove('fromType'); ctx._source.remove('toType'); ctx._source.remove('spec_version'); ctx._source.remove('representative');"
+        source: "ctx._source.remove('fromType'); ctx._source.remove('toType'); ctx._source.remove('spec_version'); ctx._source.remove('representative'); ctx._source.remove('rel_has-reference');"
       },
     }
   };
@@ -3276,6 +3403,7 @@ export const elDeleteElements = async (context, user, elements, opts = {}) => {
   const filteredRelations = await userFilterStoreElements(context, user, relations);
   if (relations.length !== filteredRelations.length) throw FunctionalError('Cannot delete element: cannot access all related relations');
   relations.forEach((instance) => controlUserConfidenceAgainstElement(user, instance));
+  relations.forEach((instance) => controlUserRestrictDeleteAgainstElement(user, instance));
   // Compute the id that needs to be removed from rel
   const basicCleanup = elements.filter((f) => isBasicRelationship(f.entity_type));
   // Update all rel connections that will remain
@@ -3580,6 +3708,8 @@ const elUpdateConnectionsOfElement = async (documentId, documentBody) => {
     index: READ_RELATIONSHIPS_INDICES,
     refresh: true,
     conflicts: 'proceed',
+    slices: 'auto', // improve performance by slicing the request
+    wait_for_completion: false, // async (query can update a lot of elements)
     body: {
       script: { source, params: { id: documentId, changes: documentBody } },
       query: {

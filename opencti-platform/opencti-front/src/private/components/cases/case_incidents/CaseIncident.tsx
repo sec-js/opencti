@@ -4,6 +4,8 @@ import React, { FunctionComponent, useRef } from 'react';
 import { useFragment } from 'react-relay';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import useHelper from 'src/utils/hooks/useHelper';
+import { CaseUtils_case$key } from '@components/cases/__generated__/CaseUtils_case.graphql';
 import { useFormatter } from '../../../../components/i18n';
 import { convertMarkings } from '../../../../utils/edition';
 import { KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
@@ -15,7 +17,6 @@ import ContainerStixObjectsOrStixRelationships from '../../common/containers/Con
 import StixCoreObjectLatestHistory from '../../common/stix_core_objects/StixCoreObjectLatestHistory';
 import StixDomainObjectOverview from '../../common/stix_domain_objects/StixDomainObjectOverview';
 import { CaseTasksLinesQuery, CaseTasksLinesQuery$variables } from '../tasks/__generated__/CaseTasksLinesQuery.graphql';
-import { CaseUtils_case$key } from '../__generated__/CaseUtils_case.graphql';
 import CaseTasksLines, { caseTasksLinesQuery } from '../tasks/CaseTasksLines';
 import { caseFragment } from '../CaseUtils';
 import CaseIncidentDetails from './CaseIncidentDetails';
@@ -26,6 +27,7 @@ import ListLines from '../../../../components/list_lines/ListLines';
 import { CaseTasksLineDummy } from '../tasks/CaseTasksLine';
 import { isFilterGroupNotEmpty, useRemoveIdAndIncorrectKeysFromFilterGroupObject } from '../../../../utils/filters/filtersUtils';
 import { FilterGroup } from '../../../../utils/filters/filtersHelpers-types';
+import { getCurrentUserAccessRight } from '../../../../utils/authorizedMembers';
 
 // Deprecated - https://mui.com/system/styles/basics/
 // Do not use it for new code.
@@ -34,8 +36,6 @@ const useStyles = makeStyles(() => ({
     marginBottom: 20,
   },
   paper: {
-    height: '100%',
-    minHeight: '100%',
     margin: '10px 0 0 0',
     padding: 0,
     borderRadius: 4,
@@ -52,6 +52,9 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
   const { t_i18n } = useFormatter();
   const ref = useRef(null);
   const caseIncidentData = useFragment(caseFragment, data);
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
+  const { canEdit } = getCurrentUserAccessRight(caseIncidentData);
 
   const LOCAL_STORAGE_KEY_CASE_TASKS = `cases-${caseIncidentData.id}-caseTask`;
 
@@ -89,17 +92,17 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <CaseIncidentDetails caseIncidentData={caseIncidentData} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview
             stixDomainObject={caseIncidentData}
             displayAssignees
             displayParticipants
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }} ref={ref}>
+        <Grid item xs={6} ref={ref}>
           {queryRef && (
             <React.Suspense
               fallback={
@@ -144,7 +147,7 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
             </React.Suspense>
           )}
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseIncidentData}
@@ -153,7 +156,7 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseIncidentData}
@@ -162,7 +165,7 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseIncidentData}
@@ -180,22 +183,26 @@ const CaseIncidentComponent: FunctionComponent<CaseIncidentProps> = ({ data, ena
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectExternalReferences
             stixCoreObjectId={caseIncidentData.id}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={caseIncidentData.id} />
         </Grid>
+        <Grid item xs={12}>
+          <StixCoreObjectOrStixCoreRelationshipNotes
+            stixCoreObjectOrStixCoreRelationshipId={caseIncidentData.id}
+            defaultMarkings={caseIncidentData.objectMarking ?? []}
+          />
+        </Grid>
       </Grid>
-      <StixCoreObjectOrStixCoreRelationshipNotes
-        stixCoreObjectOrStixCoreRelationshipId={caseIncidentData.id}
-        defaultMarkings={caseIncidentData.objectMarking ?? []}
-      />
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <CaseIncidentEdition caseId={caseIncidentData.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]} hasAccess={canEdit}>
+          <CaseIncidentEdition caseId={caseIncidentData.id} />
+        </Security>
+      )}
     </>
   );
 };

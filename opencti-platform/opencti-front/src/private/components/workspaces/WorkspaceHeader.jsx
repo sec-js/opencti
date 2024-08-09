@@ -43,6 +43,7 @@ import { useFormatter } from '../../../components/i18n';
 import WorkspaceManageAccessDialog from './WorkspaceManageAccessDialog';
 import Transition from '../../../components/Transition';
 import useHelper from '../../../utils/hooks/useHelper';
+import { getCurrentUserAccessRight } from '../../../utils/authorizedMembers';
 
 // Deprecated - https://mui.com/system/styles/basics/
 // Do not use it for new code.
@@ -108,6 +109,7 @@ const WorkspaceHeader = ({
   variant,
   adjust,
   handleDateChange,
+  widgetActions,
 }) => {
   const classes = useStyles();
   const { t_i18n } = useFormatter();
@@ -115,8 +117,7 @@ const WorkspaceHeader = ({
   const [openTag, setOpenTag] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [openTags, setOpenTags] = useState(false);
-  const userCanManage = workspace.currentUserAccessRight === 'admin';
-  const userCanEdit = userCanManage || workspace.currentUserAccessRight === 'edit';
+  const { canManage, canEdit } = getCurrentUserAccessRight(workspace);
   const [displayDuplicate, setDisplayDuplicate] = useState(false);
   const handleCloseDuplicate = () => setDisplayDuplicate(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -206,11 +207,11 @@ const WorkspaceHeader = ({
           variant="h1"
           gutterBottom={true}
           classes={{ root: classes.title }}
-          style={{ marginRight: userCanEdit ? 0 : 10 }}
+          style={{ marginRight: canEdit ? 0 : 10 }}
         >
           {workspace.name}
         </Typography>
-        <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={userCanEdit}>
+        <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={canEdit}>
           <div className={classes.popover}>
             <WorkspacePopover workspace={workspace} />
           </div>
@@ -218,7 +219,7 @@ const WorkspaceHeader = ({
         {variant === 'dashboard' && (
           <Security
             needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]}
-            hasAccess={userCanEdit}
+            hasAccess={canEdit}
             placeholder={
               <div
                 style={{
@@ -355,7 +356,7 @@ const WorkspaceHeader = ({
           </Security>
         )}
         {isFeatureEnable('PUBLIC_DASHBOARD') && variant === 'dashboard' && (
-          <Security needs={[EXPLORE_EXUPDATE_PUBLISH]} hasAccess={userCanManage}>
+          <Security needs={[EXPLORE_EXUPDATE_PUBLISH]} hasAccess={canManage}>
             <div style={{ margin: '-8px 0 0 4px', float: 'right' }}>
               <WorkspaceShareButton workspaceId={workspace.id} />
             </div>
@@ -379,6 +380,7 @@ const WorkspaceHeader = ({
             handleDashboardDuplication={isGrantedToUpdateDashboard && handleDashboardDuplication}
             variant={variant}
           />
+          {widgetActions}
         </div>
         {variant === 'investigation' && (
           <Security needs={[INVESTIGATION_INUPDATE]}>
@@ -398,7 +400,7 @@ const WorkspaceHeader = ({
             </div>
           </Security>
         )}
-        <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={userCanManage}>
+        <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={canManage}>
           <div className={classes.manageAccess}>
             <Tooltip title={t_i18n('Manage access restriction')}>
               <ToggleButtonGroup size="small" color="warning" exclusive={true}>
@@ -432,7 +434,7 @@ const WorkspaceHeader = ({
             />
             ),
           )}
-          <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={userCanEdit}>
+          <Security needs={[EXPLORE_EXUPDATE, INVESTIGATION_INUPDATE]} hasAccess={canEdit}>
             {tags.length > 1 ? (
               <IconButton
                 color="primary"

@@ -4,6 +4,7 @@ import React, { FunctionComponent, useRef } from 'react';
 import { useFragment } from 'react-relay';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import useHelper from 'src/utils/hooks/useHelper';
 import { convertMarkings } from '../../../../utils/edition';
 import { KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
 import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
@@ -34,8 +35,6 @@ const useStyles = makeStyles(() => ({
     marginBottom: 20,
   },
   paper: {
-    height: '100%',
-    minHeight: '100%',
     margin: '10px 0 0 0',
     padding: 0,
     borderRadius: 4,
@@ -52,6 +51,8 @@ const CaseRfiComponent: FunctionComponent<CaseRfiProps> = ({ data, enableReferen
   const { t_i18n } = useFormatter();
   const ref = useRef(null);
   const caseRfiData = useFragment(caseFragment, data);
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
 
   const LOCAL_STORAGE_KEY = `cases-${caseRfiData.id}-caseTask`;
   const { viewStorage, helpers, paginationOptions } = usePaginationLocalStorage<CaseTasksLinesQuery$variables>(
@@ -89,17 +90,17 @@ const CaseRfiComponent: FunctionComponent<CaseRfiProps> = ({ data, enableReferen
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <CaseRfiDetails caseRfiData={caseRfiData} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview
             stixDomainObject={caseRfiData}
             displayAssignees
             displayParticipants
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }} ref={ref}>
+        <Grid item xs={6} ref={ref}>
           {queryRef && (
             <React.Suspense
               fallback={
@@ -145,7 +146,7 @@ const CaseRfiComponent: FunctionComponent<CaseRfiProps> = ({ data, enableReferen
             </React.Suspense>
           )}
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRfiData}
@@ -154,7 +155,7 @@ const CaseRfiComponent: FunctionComponent<CaseRfiProps> = ({ data, enableReferen
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRfiData}
@@ -163,27 +164,31 @@ const CaseRfiComponent: FunctionComponent<CaseRfiProps> = ({ data, enableReferen
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRfiData}
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectExternalReferences stixCoreObjectId={caseRfiData.id} />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={caseRfiData.id} />
         </Grid>
+        <Grid item xs={12}>
+          <StixCoreObjectOrStixCoreRelationshipNotes
+            stixCoreObjectOrStixCoreRelationshipId={caseRfiData.id}
+            defaultMarkings={caseRfiData.objectMarking ?? []}
+          />
+        </Grid>
       </Grid>
-      <StixCoreObjectOrStixCoreRelationshipNotes
-        stixCoreObjectOrStixCoreRelationshipId={caseRfiData.id}
-        defaultMarkings={caseRfiData.objectMarking ?? []}
-      />
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <CaseRfiEdition caseId={caseRfiData.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <CaseRfiEdition caseId={caseRfiData.id} />
+        </Security>
+      )}
     </>
   );
 };

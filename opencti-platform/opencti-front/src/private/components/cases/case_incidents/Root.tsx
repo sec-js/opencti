@@ -11,6 +11,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import StixCoreObjectSimulationResult from '@components/common/stix_core_objects/StixCoreObjectSimulationResult';
 import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
+import Security from 'src/utils/Security';
 import ErrorNotFound from '../../../../components/ErrorNotFound';
 import Loader, { LoaderVariant } from '../../../../components/Loader';
 import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
@@ -27,8 +28,10 @@ import { RootIncidentSubscription } from '../../events/incidents/__generated__/R
 import { useFormatter } from '../../../../components/i18n';
 import Breadcrumbs from '../../../../components/Breadcrumbs';
 import { useIsEnforceReference } from '../../../../utils/hooks/useEntitySettings';
-import useGranted, { KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE } from '../../../../utils/hooks/useGranted';
+import useGranted, { KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE, KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
 import { getCurrentTab, getPaddingRight } from '../../../../utils/utils';
+import CaseIncidentEdition from './CaseIncidentEdition';
+import useHelper from '../../../../utils/hooks/useHelper';
 
 const subscription = graphql`
   subscription RootIncidentCaseSubscription($id: ID!) {
@@ -50,6 +53,18 @@ const caseIncidentQuery = graphql`
       id
       standard_id
       entity_type
+      currentUserAccessRight
+      authorized_members {
+        id
+        name
+        entity_type
+        access_right
+      }
+      creators {
+        id
+        name
+        entity_type
+      }
       name
       ...CaseUtils_case
       ...IncidentKnowledge_case
@@ -67,6 +82,23 @@ const caseIncidentQuery = graphql`
     }
     connectorsForImport {
       ...StixCoreObjectFilesAndHistory_connectorsImport
+    }
+  }
+`;
+
+// Mutation to edit authorized members of a Case Incident
+const caseIncidentAuthorizedMembersMutation = graphql`
+  mutation RootCaseIncidentAuthorizedMembersMutation(
+    $id: ID!
+    $input: [MemberAccessInput!]
+  ) {
+    caseIncidentEditAuthorizedMembers(id: $id, input: $input) {
+      authorized_members {
+        id
+        name
+        entity_type
+        access_right
+      }
     }
   }
 `;
@@ -93,10 +125,12 @@ const RootCaseIncidentComponent = ({ queryRef, caseId }) => {
   } = usePreloadedQuery<RootIncidentCaseQuery>(caseIncidentQuery, queryRef);
   const isOverview = location.pathname === `/dashboard/cases/incidents/${caseData?.id}`;
   const paddingRight = getPaddingRight(location.pathname, caseData?.id, '/dashboard/cases/incidents', false);
+  const { isFeatureEnable } = useHelper();
+  const canManageAuthorizedMembers = caseData?.currentUserAccessRight === 'admin' && isFeatureEnable('CONTAINERS_AUTHORIZED_MEMBERS');
   return (
     <>
       {caseData ? (
-        <div style={{ paddingRight }}>
+        <div style={{ paddingRight }} data-testid="incident-details-page">
           <Breadcrumbs variant="object" elements={[
             { label: t_i18n('Cases') },
             { label: t_i18n('Incident responses'), link: '/dashboard/cases/incidents' },
@@ -106,15 +140,25 @@ const RootCaseIncidentComponent = ({ queryRef, caseId }) => {
           <ContainerHeader
             container={caseData}
             PopoverComponent={<CaseIncidentPopover id={caseData.id} />}
+            EditComponent={
+              <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                <CaseIncidentEdition caseId={caseData.id} />
+              </Security>
+            }
             enableQuickSubscription={true}
             enableAskAi={true}
             redirectToContent={true}
+            enableManageAuthorizedMembers={canManageAuthorizedMembers}
+            authorizedMembersMutation={caseIncidentAuthorizedMembersMutation}
           />
           <Box
             sx={{
               borderBottom: 1,
               borderColor: 'divider',
               marginBottom: 4,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItem: 'center',
             }}
           >
             <Tabs

@@ -5,18 +5,19 @@ import { executionContext, SYSTEM_USER } from '../utils/access';
 import { TYPE_LOCK_ERROR } from '../config/errors';
 import Queue from '../utils/queue';
 import { ENTITY_TYPE_SYNC } from '../schema/internalObject';
-import { createSyncHttpUri, httpBase, patchSync } from '../domain/connector';
+import { patchSync } from '../domain/connector';
 import { EVENT_CURRENT_VERSION, lockResource } from '../database/redis';
 import { STIX_EXT_OCTI } from '../types/stix-extensions';
 import { utcDate } from '../utils/format';
 import { listEntities, storeLoadById } from '../database/middleware-loader';
 import { isEmptyField, wait } from '../database/utils';
-import { pushToSync } from '../database/rabbitmq';
+import { pushToWorkerForSync } from '../database/rabbitmq';
 import { OPENCTI_SYSTEM_UUID } from '../schema/general';
 import { getHttpClient } from '../utils/http-client';
+import { createSyncHttpUri, httpBase } from '../domain/connector-utils';
 
 const SYNC_MANAGER_KEY = conf.get('sync_manager:lock_key') || 'sync_manager_lock';
-const SCHEDULE_TIME = 10000;
+const SCHEDULE_TIME = conf.get('sync_manager:interval') || 10000;
 const WAIT_TIME_ACTION = 2000;
 
 const syncManagerInstance = (syncId) => {
@@ -137,7 +138,7 @@ const syncManagerInstance = (syncId) => {
               const enrichedEvent = JSON.stringify({ id: eventId, type: eventType, data: syncData, context: eventContext });
               const content = Buffer.from(enrichedEvent, 'utf-8').toString('base64');
               // Applicant_id should be a userId coming from synchronizer
-              await pushToSync({
+              await pushToWorkerForSync({
                 type: 'event',
                 synchronized,
                 previous_standard,

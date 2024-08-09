@@ -255,6 +255,7 @@ class ReportKnowledgeComponent extends Component {
       <div
         className={classes.container}
         id={location.pathname.includes('matrix') ? 'parent' : 'container'}
+        data-testid='report-knowledge'
       >
         {mode !== 'graph' && (
         <ContainerHeader
@@ -284,7 +285,7 @@ class ReportKnowledgeComponent extends Component {
                   return (
                     <Loader
                       variant={LoaderVariant.inElement}
-                      withTopMargin={true}
+                      withTopMargin={false}
                     />
                   );
                 }}
@@ -332,7 +333,7 @@ class ReportKnowledgeComponent extends Component {
                     return (
                       <Loader
                         variant={LoaderVariant.inElement}
-                        withTopMargin={true}
+                        withTopMargin={false}
                       />
                     );
                   }}
@@ -353,7 +354,7 @@ class ReportKnowledgeComponent extends Component {
                   return (
                     <Loader
                       variant={LoaderVariant.inElement}
-                      withTopMargin={true}
+                      withTopMargin={false}
                     />
                   );
                 }}
@@ -395,7 +396,7 @@ class ReportKnowledgeComponent extends Component {
                   return (
                     <Loader
                       variant={LoaderVariant.inElement}
-                      withTopMargin={true}
+                      withTopMargin={false}
                     />
                   );
                 }}

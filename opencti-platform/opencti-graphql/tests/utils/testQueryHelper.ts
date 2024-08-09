@@ -32,8 +32,18 @@ export const queryAsAdminWithSuccess = async (request: { query: any, variables: 
 export const queryAsUserWithSuccess = async (client: AxiosInstance, request: { query: any, variables: any }) => {
   const requestResult = await executeInternalQuery(client, print(request.query), request.variables);
   expect(requestResult, `Something is wrong with this query: ${request.query}`).toBeDefined();
-  expect(requestResult.errors, `This errors should not be there: ${requestResult.errors}`).toBeUndefined();
+  expect(requestResult.errors, `This errors should not be there: ${JSON.stringify(requestResult.errors)}`).toBeUndefined();
   return requestResult;
+};
+
+/**
+ * Execute the query as some User, and just return response (no validation).
+ * @param client
+ * @param request
+ */
+export const queryAsUser = async (client: AxiosInstance, request: { query: any, variables: any }) => {
+  const result = await executeInternalQuery(client, print(request.query), request.variables);
+  return result;
 };
 
 /**

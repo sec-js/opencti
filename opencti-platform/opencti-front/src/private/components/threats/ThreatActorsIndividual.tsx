@@ -57,7 +57,7 @@ const ThreatActorsIndividual = () => {
 
   const { isFeatureEnable } = useHelper();
   const dataTableEnabled = isFeatureEnable('DATA_TABLES');
-
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   const renderCards = () => {
     const {
       numberOfElements,
@@ -98,6 +98,11 @@ const ThreatActorsIndividual = () => {
         paginationOptions={paginationOptions}
         numberOfElements={numberOfElements}
         handleChangeView={dataTableEnabled ? helpers.handleChangeView : undefined}
+        createButton={isFABReplaced && (
+          <Security needs={[KNOWLEDGE_KNUPDATE]}>
+            <ThreatActorIndividualCreation paginationOptions={queryPaginationOptions} />
+          </Security>
+        )}
       >
         {queryRef && (
           <React.Suspense
@@ -107,7 +112,7 @@ const ThreatActorsIndividual = () => {
                   .fill(0)
                   .map((_, idx) => (
                     <Grid
-                      item={true}
+                      item
                       xs={3}
                       key={idx}
                     >
@@ -177,6 +182,11 @@ const ThreatActorsIndividual = () => {
                 </Tooltip>
               </ToggleButton>),
             ]}
+            createButton={isFABReplaced && (
+              <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                <ThreatActorIndividualCreation paginationOptions={queryPaginationOptions} />
+              </Security>
+            )}
           />
         )}
       </>
@@ -187,9 +197,11 @@ const ThreatActorsIndividual = () => {
     <>
       <Breadcrumbs variant="list" elements={[{ label: t_i18n('Threats') }, { label: t_i18n('Threat actors (individual)'), current: true }]} />
       {viewStorage.view !== 'lines' || !dataTableEnabled ? renderCards() : renderList()}
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <ThreatActorIndividualCreation paginationOptions={queryPaginationOptions} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <ThreatActorIndividualCreation paginationOptions={queryPaginationOptions} />
+        </Security>
+      )}
     </>
   );
 };

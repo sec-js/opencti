@@ -10,7 +10,7 @@ import { Filter, FilterGroup, handleFilterHelpers } from '../utils/filters/filte
 
 export interface FilterIconButtonProps {
   availableFilterKeys?: string[];
-  filters?: FilterGroup;
+  filters?: FilterGroup | null;
   handleRemoveFilter?: (key: string, op?: string) => void;
   handleSwitchGlobalMode?: () => void;
   handleSwitchLocalMode?: (filter: Filter) => void;
@@ -23,9 +23,9 @@ export interface FilterIconButtonProps {
   availableRelationFilterTypes?: Record<string, string[]>;
   entityTypes?: string[];
   filtersRestrictions?: FiltersRestrictions;
-  searchContext?: FilterSearchContext
-  availableEntityTypes?: string[]
-  availableRelationshipTypes?: string[]
+  searchContext?: FilterSearchContext;
+  availableEntityTypes?: string[];
+  availableRelationshipTypes?: string[];
 }
 
 interface FilterIconButtonIfFiltersProps extends FilterIconButtonProps {

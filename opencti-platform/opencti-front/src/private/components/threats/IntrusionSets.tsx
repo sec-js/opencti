@@ -60,6 +60,7 @@ const IntrusionSets = () => {
 
   const { isFeatureEnable } = useHelper();
   const dataTableEnabled = isFeatureEnable('DATA_TABLES');
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
 
   const renderCards = () => {
     const dataColumns = {
@@ -93,6 +94,11 @@ const IntrusionSets = () => {
         paginationOptions={queryPaginationOptions}
         numberOfElements={numberOfElements}
         handleChangeView={dataTableEnabled ? helpers.handleChangeView : undefined}
+        createButton={isFABReplaced && (
+          <Security needs={[KNOWLEDGE_KNUPDATE]}>
+            <IntrusionSetCreation paginationOptions={queryPaginationOptions} />
+          </Security>
+        )}
       >
         {queryRef && (
           <React.Suspense
@@ -102,7 +108,7 @@ const IntrusionSets = () => {
                   .fill(0)
                   .map((_, idx) => (
                     <Grid
-                      item={true}
+                      item
                       xs={3}
                       key={idx}
                     >
@@ -169,6 +175,11 @@ const IntrusionSets = () => {
                 </Tooltip>
               </ToggleButton>),
             ]}
+            createButton={isFABReplaced && (
+              <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                <IntrusionSetCreation paginationOptions={queryPaginationOptions} />
+              </Security>
+            )}
           />
         )}
       </>
@@ -179,9 +190,11 @@ const IntrusionSets = () => {
     <>
       <Breadcrumbs variant="list" elements={[{ label: t_i18n('Threats') }, { label: t_i18n('Intrusion sets'), current: true }]} />
       {viewStorage.view !== 'lines' || !dataTableEnabled ? renderCards() : renderList()}
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <IntrusionSetCreation paginationOptions={queryPaginationOptions} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <IntrusionSetCreation paginationOptions={queryPaginationOptions} />
+        </Security>
+      )}
     </>
   );
 };

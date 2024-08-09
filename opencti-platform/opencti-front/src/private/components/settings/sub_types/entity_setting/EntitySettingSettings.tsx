@@ -38,6 +38,11 @@ export const entitySettingFragment = graphql`
         name
       }
     }
+    overview_layout_customization {
+        key
+        width
+        label
+    }
   }
 `;
 
@@ -78,7 +83,7 @@ const EntitySettingSettings = ({
   };
   return (
     <Grid container={true} spacing={3}>
-      <Grid item={true} xs={6}>
+      <Grid item xs={6}>
         <div>
           <Typography
             variant="h3"
@@ -131,7 +136,7 @@ const EntitySettingSettings = ({
           </>
         </Security>
       </Grid>
-      <Grid item={true} xs={6}>
+      <Grid item xs={6}>
         <div>
           <Typography
             variant="h3"

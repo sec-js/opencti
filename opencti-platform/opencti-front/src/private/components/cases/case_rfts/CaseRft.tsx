@@ -4,6 +4,7 @@ import React, { FunctionComponent, useRef } from 'react';
 import { useFragment } from 'react-relay';
 import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import useHelper from 'src/utils/hooks/useHelper';
 import { convertMarkings } from '../../../../utils/edition';
 import { KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
 import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
@@ -34,8 +35,6 @@ const useStyles = makeStyles(() => ({
     marginBottom: 20,
   },
   paper: {
-    height: '100%',
-    minHeight: '100%',
     margin: '10px 0 0 0',
     padding: 0,
     borderRadius: 4,
@@ -50,6 +49,8 @@ interface CaseRftProps {
 const CaseRftComponent: FunctionComponent<CaseRftProps> = ({ data, enableReferences }) => {
   const classes = useStyles();
   const { t_i18n } = useFormatter();
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   const ref = useRef(null);
   const caseRftData = useFragment(caseFragment, data);
   const LOCAL_STORAGE_KEY_CASE_TASKS = `cases-${caseRftData.id}-caseTask`;
@@ -87,17 +88,17 @@ const CaseRftComponent: FunctionComponent<CaseRftProps> = ({ data, enableReferen
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <CaseRftDetails caseRftData={caseRftData} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview
             stixDomainObject={caseRftData}
             displayAssignees
             displayParticipants
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }} ref={ref}>
+        <Grid item xs={6} ref={ref}>
           {queryRef && (
             <React.Suspense
               fallback={
@@ -143,7 +144,7 @@ const CaseRftComponent: FunctionComponent<CaseRftProps> = ({ data, enableReferen
             </React.Suspense>
           )}
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRftData}
@@ -152,7 +153,7 @@ const CaseRftComponent: FunctionComponent<CaseRftProps> = ({ data, enableReferen
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRftData}
@@ -161,27 +162,31 @@ const CaseRftComponent: FunctionComponent<CaseRftProps> = ({ data, enableReferen
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <ContainerStixObjectsOrStixRelationships
             isSupportParticipation={false}
             container={caseRftData}
             enableReferences={enableReferences}
           />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectExternalReferences stixCoreObjectId={caseRftData.id} />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={caseRftData.id} />
         </Grid>
+        <Grid item xs={12}>
+          <StixCoreObjectOrStixCoreRelationshipNotes
+            stixCoreObjectOrStixCoreRelationshipId={caseRftData.id}
+            defaultMarkings={caseRftData.objectMarking ?? []}
+          />
+        </Grid>
       </Grid>
-      <StixCoreObjectOrStixCoreRelationshipNotes
-        stixCoreObjectOrStixCoreRelationshipId={caseRftData.id}
-        defaultMarkings={caseRftData.objectMarking ?? []}
-      />
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <CaseRftEdition caseId={caseRftData.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <CaseRftEdition caseId={caseRftData.id} />
+        </Security>
+      )}
     </>
   );
 };

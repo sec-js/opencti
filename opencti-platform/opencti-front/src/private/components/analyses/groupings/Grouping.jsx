@@ -2,6 +2,7 @@ import React from 'react';
 import { graphql, createFragmentContainer } from 'react-relay';
 import Grid from '@mui/material/Grid';
 import makeStyles from '@mui/styles/makeStyles';
+import useHelper from '../../../../utils/hooks/useHelper';
 import GroupingDetails from './GroupingDetails';
 import GroupingEdition from './GroupingEdition';
 import StixDomainObjectOverview from '../../common/stix_domain_objects/StixDomainObjectOverview';
@@ -21,6 +22,8 @@ const useStyles = makeStyles(() => ({
 
 const GroupingComponent = ({ grouping }) => {
   const classes = useStyles();
+  const { isFeatureEnable } = useHelper();
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   return (
     <div data-testid="grouping-details-page">
       <Grid
@@ -28,26 +31,30 @@ const GroupingComponent = ({ grouping }) => {
         spacing={3}
         classes={{ container: classes.gridContainer }}
       >
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <GroupingDetails grouping={grouping} />
         </Grid>
-        <Grid item={true} xs={6} style={{ paddingTop: 10 }}>
+        <Grid item xs={6}>
           <StixDomainObjectOverview stixDomainObject={grouping} />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectExternalReferences stixCoreObjectId={grouping.id} />
         </Grid>
-        <Grid item={true} xs={6} style={{ marginTop: 30 }}>
+        <Grid item xs={6}>
           <StixCoreObjectLatestHistory stixCoreObjectId={grouping.id} />
         </Grid>
+        <Grid item xs={12}>
+          <StixCoreObjectOrStixCoreRelationshipNotes
+            stixCoreObjectOrStixCoreRelationshipId={grouping.id}
+            defaultMarkings={grouping.objectMarking ?? []}
+          />
+        </Grid>
       </Grid>
-      <StixCoreObjectOrStixCoreRelationshipNotes
-        stixCoreObjectOrStixCoreRelationshipId={grouping.id}
-        defaultMarkings={grouping.objectMarking ?? []}
-      />
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <GroupingEdition groupingId={grouping.id} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <GroupingEdition groupingId={grouping.id} />
+        </Security>
+      )}
     </div>
   );
 };

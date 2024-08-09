@@ -36,6 +36,13 @@ export interface BasicStoreEntityEntitySetting extends BasicStoreEntity {
   attributes_configuration?: string;
   workflow_configuration: boolean;
   availableSettings?: string[];
+  overview_layout_customization?: Array<OverviewLayoutCustomization>;
+}
+
+export interface OverviewLayoutCustomization {
+  key: string;
+  width: number;
+  label: string;
 }
 
 export interface StoreEntityEntitySetting extends StoreEntity {
@@ -46,6 +53,7 @@ export interface StoreEntityEntitySetting extends StoreEntity {
   attributes_configuration?: string;
   workflow_configuration: boolean;
   availableSettings?: string[];
+  overviewLayoutCustomization?: Array<string>;
 }
 
 export interface StixEntitySetting extends StixObject {

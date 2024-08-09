@@ -16,11 +16,15 @@ import { generateInternalType, getParentTypes } from '../schema/schemaUtils';
 import { telemetry } from '../config/tracing';
 import type { BasicStoreSettings } from '../types/settings';
 import { ACCOUNT_STATUS_ACTIVE } from '../config/conf';
+import { schemaAttributesDefinition } from '../schema/schema-attributes';
+import { FunctionalError } from '../config/errors';
+import { isNotEmptyField } from '../database/utils';
 
 export const DEFAULT_INVALID_CONF_VALUE = 'ChangeMe';
 
 export const BYPASS = 'BYPASS';
 export const KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE = 'KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE';
+export const KNOWLEDGE_KNUPDATE_KNBYPASSFIELDS = 'KNOWLEDGE_KNUPDATE_KNBYPASSFIELDS';
 export const SETTINGS_SET_ACCESSES = 'SETTINGS_SETACCESSES';
 export const TAXIIAPI_SETCOLLECTIONS = 'TAXIIAPI_SETCOLLECTIONS';
 export const CSVMAPPERS = 'CSVMAPPERS';
@@ -47,6 +51,12 @@ export const MEMBER_ACCESS_RIGHT_ADMIN = 'admin';
 export const MEMBER_ACCESS_RIGHT_EDIT = 'edit';
 export const MEMBER_ACCESS_RIGHT_VIEW = 'view';
 const MEMBER_ACCESS_RIGHTS = [MEMBER_ACCESS_RIGHT_VIEW, MEMBER_ACCESS_RIGHT_EDIT, MEMBER_ACCESS_RIGHT_ADMIN];
+
+type ObjectWithCreators = {
+  id: string,
+  entity_type: string,
+  creator_id?: string | string[] | undefined
+};
 
 const administratorRoleId = uuidv4();
 export const ADMINISTRATOR_ROLE: UserRole = {
@@ -92,6 +102,8 @@ export const SYSTEM_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const RETENTION_MANAGER_USER: AuthUser = {
@@ -124,6 +136,8 @@ export const RETENTION_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const RULE_MANAGER_USER: AuthUser = {
@@ -156,6 +170,8 @@ export const RULE_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const AUTOMATION_MANAGER_USER: AuthUser = {
@@ -188,6 +204,8 @@ export const AUTOMATION_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const DECAY_MANAGER_USER: AuthUser = {
@@ -220,6 +238,8 @@ export const DECAY_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const GARBAGE_COLLECTION_MANAGER_USER: AuthUser = {
@@ -252,6 +272,8 @@ export const GARBAGE_COLLECTION_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const REDACTED_USER: AuthUser = {
@@ -278,6 +300,8 @@ export const REDACTED_USER: AuthUser = {
   account_status: ACCOUNT_STATUS_ACTIVE,
   effective_confidence_level: null,
   user_confidence_level: null,
+  no_creators: false,
+  restrict_delete: false,
 };
 
 export const TELEMETRY_MANAGER_USER: AuthUser = {
@@ -310,6 +334,8 @@ export const TELEMETRY_MANAGER_USER: AuthUser = {
     max_confidence: 100,
     overrides: [],
   },
+  no_creators: false,
+  restrict_delete: false,
 };
 export interface AuthorizedMember { id: string, access_right: string }
 
@@ -394,6 +420,10 @@ export const userFilterStoreElements = async (context: AuthContext, user: AuthUs
       if (settings.platform_organization) {
         // If user part of platform organization, is granted by default
         if (user.inside_platform_organization) {
+          return true;
+        }
+        // Grant access to the user individual
+        if (element.internal_id === user.individual_id) {
           return true;
         }
         // If not, user is by design inside an organization
@@ -527,4 +557,18 @@ export const validateUserAccessOperation = (user: AuthUser, element: any, operat
 
 export const isValidMemberAccessRight = (accessRight: string) => {
   return accessRight && MEMBER_ACCESS_RIGHTS.includes(accessRight);
+};
+
+export const controlUserRestrictDeleteAgainstElement = <T extends ObjectWithCreators>(user: AuthUser, existingElement: T, noThrow = false) => {
+  const hasCreatorIdAttribute = schemaAttributesDefinition.getAttribute(existingElement.entity_type, 'creator_id');
+  if (!hasCreatorIdAttribute) {
+    return true; // no creator to check, it's ok
+  }
+  if (user.restrict_delete && isNotEmptyField(existingElement.creator_id as string[]) && existingElement.creator_id !== user.id && !existingElement.creator_id?.includes(user.id)) {
+    if (noThrow) {
+      return false;
+    }
+    throw FunctionalError('Restricted to delete this element (not the technical creator)', { user_id: user.id, element_id: existingElement.id });
+  }
+  return true;
 };

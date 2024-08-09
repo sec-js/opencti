@@ -1,4 +1,5 @@
 import React, { FunctionComponent } from 'react';
+import useHelper from 'src/utils/hooks/useHelper';
 import ListLines from '../../../components/list_lines/ListLines';
 import IncidentsLines, { incidentsLinesPaginationQuery } from './incidents/IncidentsLines';
 import IncidentCreation from './incidents/IncidentCreation';
@@ -21,6 +22,7 @@ export const LOCAL_STORAGE_KEY = 'incidents';
 
 const Incidents: FunctionComponent = () => {
   const { t_i18n } = useFormatter();
+  const { isFeatureEnable } = useHelper();
   const {
     platformModuleHelpers: { isRuntimeFieldEnable },
   } = useAuth();
@@ -111,9 +113,10 @@ const Incidents: FunctionComponent = () => {
       isSortable: isRuntimeSort,
     },
   };
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   const renderLines = () => {
     return (
-      <>
+      <div data-testid='incident-page'>
         <ListLines
           helpers={helpers}
           sortBy={sortBy}
@@ -135,6 +138,11 @@ const Incidents: FunctionComponent = () => {
           paginationOptions={queryPaginationOptions}
           numberOfElements={numberOfElements}
           iconExtension={true}
+          createButton={isFABReplaced && (
+            <Security needs={[KNOWLEDGE_KNUPDATE]}>
+              <IncidentCreation paginationOptions={queryPaginationOptions} />
+            </Security>
+          )}
         >
           {queryRef && (
             <React.Suspense
@@ -172,16 +180,18 @@ const Incidents: FunctionComponent = () => {
           handleClearSelectedElements={handleClearSelectedElements}
           type="Incident"
         />
-      </>
+      </div>
     );
   };
   return (
     <ExportContextProvider>
       <Breadcrumbs variant="list" elements={[{ label: t_i18n('Events') }, { label: t_i18n('Incidents'), current: true }]} />
       {renderLines()}
-      <Security needs={[KNOWLEDGE_KNUPDATE]}>
-        <IncidentCreation paginationOptions={queryPaginationOptions} />
-      </Security>
+      {!isFABReplaced && (
+        <Security needs={[KNOWLEDGE_KNUPDATE]}>
+          <IncidentCreation paginationOptions={queryPaginationOptions} />
+        </Security>
+      )}
     </ExportContextProvider>
   );
 };

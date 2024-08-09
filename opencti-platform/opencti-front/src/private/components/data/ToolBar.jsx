@@ -53,6 +53,7 @@ class ToolBar extends Component {
       numberOfSelectedElements,
       handleClearSelectedElements,
       selectedElements,
+      deSelectedElements,
       selectAll,
       filters,
       container,
@@ -66,6 +67,8 @@ class ToolBar extends Component {
       noAuthor,
       noWarning,
       noMarking,
+      handleCopy,
+      search,
     } = this.props;
     const { navOpen } = this.state;
     const isOpen = numberOfSelectedElements > 0;
@@ -98,9 +101,11 @@ class ToolBar extends Component {
             }}
           >
             <DataTableToolBar
+              search={search}
               numberOfSelectedElements={numberOfSelectedElements}
               handleClearSelectedElements={handleClearSelectedElements}
               selectedElements={selectedElements}
+              deSelectedElements={deSelectedElements}
               selectAll={selectAll}
               filters={filters}
               container={container}
@@ -114,6 +119,7 @@ class ToolBar extends Component {
               noMarking={noMarking}
               mergeDisable={mergeDisable}
               deleteOperationEnabled={deleteOperationEnabled}
+              handleCopy={handleCopy}
             />
           </Drawer>
         )}

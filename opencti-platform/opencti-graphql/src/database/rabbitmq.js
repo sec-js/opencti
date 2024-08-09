@@ -82,15 +82,23 @@ export const purgeConnectorQueues = async (connector) => {
 };
 
 export const getConnectorQueueDetails = async (connectorId) => {
-  const httpClient = await amqpHttpClient();
-  const pathRabbit = `/api/queues${isEmptyField(VHOST_PATH) ? '/%2F' : VHOST_PATH}/${RABBITMQ_PUSH_QUEUE_PREFIX}${connectorId}`;
+  try {
+    const httpClient = await amqpHttpClient();
+    const pathRabbit = `/api/queues${isEmptyField(VHOST_PATH) ? '/%2F' : VHOST_PATH}/${RABBITMQ_PUSH_QUEUE_PREFIX}${connectorId}`;
 
-  const queueDetailResponse = await httpClient.get(pathRabbit).then((response) => response.data);
-  logApp.debug('Rabbit HTTP API response', { queueDetailResponse });
-  return {
-    messages_number: queueDetailResponse.messages || 0,
-    messages_size: queueDetailResponse.message_bytes || 0
-  };
+    const queueDetailResponse = await httpClient.get(pathRabbit).then((response) => response.data);
+    logApp.debug('Rabbit HTTP API response', { queueDetailResponse });
+    return {
+      messages_number: queueDetailResponse.messages || 0,
+      messages_size: queueDetailResponse.message_bytes || 0
+    };
+  } catch (e) {
+    logApp.error(e, { connectorId });
+    return {
+      messages_number: 0,
+      messages_size: 0
+    };
+  }
 };
 
 const amqpExecute = async (execute) => {
@@ -110,25 +118,32 @@ const amqpExecute = async (execute) => {
           reject(err);
         } else { // Connection success
           conn.on('error', (onConnectError) => {
+            logApp.error('Rabbit Error trying to connect', { onConnectError });
             reject(onConnectError);
           });
           conn.createConfirmChannel((channelError, channel) => {
             if (channelError) {
+              logApp.error('Rabbit Error on channel', { channelError });
               reject(channelError);
             } else {
               channel.on('error', (onChannelError) => {
+                logApp.error('Rabbit Error on channel', { onChannelError });
                 reject(onChannelError);
               });
               execute(channel).then((data) => {
                 channel.close();
                 conn.close();
                 resolve(data);
-              }).catch((executeError) => reject(executeError));
+              }).catch((executeError) => {
+                logApp.error('Rabbit Error on execute', { executeError });
+                reject(executeError);
+              });
             }
           });
         }
       });
     } catch (globalError) {
+      logApp.error('Rabbit Error', { globalError });
       reject(globalError);
     }
   });
@@ -244,12 +259,17 @@ export const rabbitMQIsAlive = async () => {
   );
 };
 
-export const pushToSync = (message) => {
+export const pushToWorkerForSync = (message) => {
   return send(WORKER_EXCHANGE, pushRouting(INTERNAL_SYNC_QUEUE), JSON.stringify(message));
 };
 
-export const pushToPlaybook = (message) => {
+export const pushToWorkerForPlaybook = (message) => {
   return send(WORKER_EXCHANGE, pushRouting(INTERNAL_PLAYBOOK_QUEUE), JSON.stringify(message));
+};
+
+export const pushToWorkerForConnector = (connectorId, message) => {
+  const routingKey = pushRouting(connectorId);
+  return send(WORKER_EXCHANGE, routingKey, JSON.stringify(message));
 };
 
 export const pushToConnector = (connectorId, message) => {

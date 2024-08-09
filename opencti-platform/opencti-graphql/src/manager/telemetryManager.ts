@@ -4,7 +4,7 @@ import { SEMRESATTRS_SERVICE_INSTANCE_ID } from '@opentelemetry/semantic-convent
 import { ConsoleMetricExporter, InstrumentType, MeterProvider } from '@opentelemetry/sdk-metrics';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { AggregationTemporality } from '@opentelemetry/sdk-metrics/build/src/export/AggregationTemporality';
-import conf, { DEV_MODE, logApp, PLATFORM_VERSION } from '../config/conf';
+import conf, { DEV_MODE, isFeatureEnabled, logApp, PLATFORM_VERSION } from '../config/conf';
 import { executionContext, TELEMETRY_MANAGER_USER } from '../utils/access';
 import { isNotEmptyField } from '../database/utils';
 import type { Settings } from '../generated/graphql';
@@ -19,7 +19,7 @@ import { ENTITY_TYPE_CONNECTOR, ENTITY_TYPE_SETTINGS, ENTITY_TYPE_USER } from '.
 import { BatchExportingMetricReader } from '../telemetry/BatchExportingMetricReader';
 import type { BasicStoreSettings } from '../types/settings';
 import { getHttpClient } from '../utils/http-client';
-import type { StoreConnector } from '../types/connector';
+import type { BasicStoreEntityConnector } from '../types/connector';
 
 const TELEMETRY_MANAGER_KEY = conf.get('telemetry_manager:lock_key');
 const TELEMETRY_CONSOLE_DEBUG = conf.get('telemetry_manager:console_debug') ?? false;
@@ -37,6 +37,8 @@ const TELEMETRY_COLLECT_INTERVAL = DEV_MODE ? ONE_MINUTE : ONE_HOUR;
 const TELEMETRY_EXPORT_INTERVAL = DEV_MODE ? TWO_MINUTE : SIX_HOUR;
 // Manager schedule, data point generation
 const COMPUTE_SCHEDULE_TIME = DEV_MODE ? ONE_MINUTE / 2 : ONE_HOUR / 2;
+
+const TELEMETRY_COUNT_ACTIVE_USERS = isFeatureEnabled('TELEMETRY_COUNT_ACTIVE_USERS');
 
 const telemetryInitializer = async (): Promise<HandlerInput> => {
   const context = executionContext('telemetry_manager');
@@ -116,13 +118,15 @@ const fetchTelemetryData = async (manager: TelemetryMeterManager) => {
     manager.setInstancesCount(clusterInfo.info.instances_number);
     // endregion
     // region Users information
-    const activUsers = await usersWithActiveSession(TELEMETRY_COLLECT_INTERVAL / 1000 / 60);
-    manager.setActiveUsersCount(activUsers.length);
+    if (TELEMETRY_COUNT_ACTIVE_USERS) {
+      const activUsers = await usersWithActiveSession(TELEMETRY_COLLECT_INTERVAL / 1000 / 60);
+      manager.setActiveUsersCount(activUsers.length);
+    }
     const users = await getEntitiesListFromCache(context, TELEMETRY_MANAGER_USER, ENTITY_TYPE_USER);
     manager.setUsersCount(users.length);
     // endregion
     // region Connectors information
-    const connectors = await getEntitiesListFromCache<StoreConnector>(context, TELEMETRY_MANAGER_USER, ENTITY_TYPE_CONNECTOR);
+    const connectors = await getEntitiesListFromCache<BasicStoreEntityConnector>(context, TELEMETRY_MANAGER_USER, ENTITY_TYPE_CONNECTOR);
     const activeConnectors = connectors.filter((c) => c.active);
     manager.setActiveConnectorsCount(activeConnectors.length);
     // endregion

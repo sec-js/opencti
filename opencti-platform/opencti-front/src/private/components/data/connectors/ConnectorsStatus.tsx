@@ -9,7 +9,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import { graphql, PreloadedQuery, useQueryLoader } from 'react-relay';
-import { ExtensionOutlined, DeleteOutlined, PlaylistRemoveOutlined } from '@mui/icons-material';
+import { DeleteOutlined, ExtensionOutlined, PlaylistRemoveOutlined } from '@mui/icons-material';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -65,7 +65,7 @@ const useStyles = makeStyles<Theme>((theme) => ({
 const inlineStyles: Record<string, CSSProperties> = {
   name: {
     float: 'left',
-    width: '35%',
+    width: '25%',
     height: 20,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -73,7 +73,7 @@ const inlineStyles: Record<string, CSSProperties> = {
   },
   connector_type: {
     float: 'left',
-    width: '20%',
+    width: '10%',
     height: 20,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -81,7 +81,7 @@ const inlineStyles: Record<string, CSSProperties> = {
   },
   auto: {
     float: 'left',
-    width: '20%',
+    width: '15%',
     height: 20,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -90,13 +90,20 @@ const inlineStyles: Record<string, CSSProperties> = {
   messages: {
     float: 'left',
     width: '10%',
+    paddingLeft: 5,
     height: 20,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
+  active: {
+    float: 'left',
+    width: '15%',
+  },
   updated_at: {
     float: 'left',
+    width: '15%',
+    paddingLeft: 5,
     height: 20,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -318,7 +325,7 @@ const ConnectorsStatusComponent: FunctionComponent<ConnectorsStatusComponentProp
             <ListItem
               classes={{ root: classes.itemHead }}
               divider={false}
-              style={{ paddingTop: 0 }}
+              style={{ paddingTop: 0, paddingRight: 10 }}
             >
               <ListItemIcon>
                 <span
@@ -333,12 +340,29 @@ const ConnectorsStatusComponent: FunctionComponent<ConnectorsStatusComponentProp
               </ListItemIcon>
               <ListItemText
                 primary={
-                  <div>
-                    <SortConnectorsHeader field="name" label="Name" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
-                    <SortConnectorsHeader field="connector_type" label="Type" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
-                    <SortConnectorsHeader field="auto" label="Automatic trigger" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
-                    <SortConnectorsHeader field="messages" label="Messages" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
-                    <SortConnectorsHeader field="updated_at" label="Modified" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                  <div style={{
+                    display: 'flex',
+                    width: '100%',
+                  }}
+                  >
+                    <div style={{ flexBasis: '25%' }}>
+                      <SortConnectorsHeader field="name" label="Name" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
+                    <div style={{ flexBasis: '10%' }}>
+                      <SortConnectorsHeader field="connector_type" label="Type" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
+                    <div style={{ flexBasis: '15%' }}>
+                      <SortConnectorsHeader field="auto" label="Automatic trigger" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
+                    <div style={{ flexBasis: '10%' }}>
+                      <SortConnectorsHeader field="messages" label="Messages" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
+                    <div style={{ flexBasis: '15%' }}>
+                      <SortConnectorsHeader field="active" label="Status" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
+                    <div style={{ flexBasis: '20%' }}>
+                      <SortConnectorsHeader field="updated_at" label="Modified" isSortable orderAsc={orderAsc} sortBy={sortBy} reverseBy={reverseBy} />
+                    </div>
                   </div>
                   }
               />
@@ -353,9 +377,7 @@ const ConnectorsStatusComponent: FunctionComponent<ConnectorsStatusComponentProp
                 component={Link}
                 to={`/dashboard/data/ingestion/connectors/${connector.id}`}
               >
-                <ListItemIcon
-                  style={{ color: connector.active ? '#4caf50' : '#f44336' }}
-                >
+                <ListItemIcon>
                   <ExtensionOutlined />
                 </ListItemIcon>
                 <ListItemText
@@ -388,6 +410,15 @@ const ConnectorsStatusComponent: FunctionComponent<ConnectorsStatusComponentProp
                         style={inlineStyles.messages}
                       >
                         {n(connector.messages)}
+                      </div>
+                      <div
+                        className={classes.bodyItem}
+                        style={inlineStyles.active}
+                      >
+                        <ItemBoolean
+                          status={connector.active}
+                          label={connector.active ? t_i18n('Active') : t_i18n('Inactive')}
+                        />
                       </div>
                       <div
                         className={classes.bodyItem}

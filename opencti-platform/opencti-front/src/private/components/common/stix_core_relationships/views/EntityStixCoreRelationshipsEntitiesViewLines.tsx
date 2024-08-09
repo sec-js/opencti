@@ -32,8 +32,6 @@ interface EntityStixCoreRelationshipsEntitiesProps {
 const entityStixCoreRelationshipsEntitiesFragment = graphql`
   fragment EntityStixCoreRelationshipsEntitiesViewLines_data on Query
   @argumentDefinitions(
-    entityId: { type: "ID" }
-    relationshipTypes: { type: "[String]" }
     search: { type: "String" }
     count: { type: "Int", defaultValue: 25 }
     cursor: { type: "ID" }
@@ -43,9 +41,7 @@ const entityStixCoreRelationshipsEntitiesFragment = graphql`
     types: { type: "[String]" }
   )
   @refetchable(queryName: "EntityStixCoreRelationshipsEntities_refetch") {
-    stixCoreObjectsRegardingOf(
-      entityId: $entityId
-      relationshipTypes: $relationshipTypes
+    stixCoreObjects(
       search: $search
       first: $count
       after: $cursor
@@ -53,7 +49,7 @@ const entityStixCoreRelationshipsEntitiesFragment = graphql`
       orderMode: $orderMode
       filters: $filters
       types: $types
-    ) @connection(key: "Pagination_stixCoreObjectsRegardingOf") {
+    ) @connection(key: "Pagination_stixCoreObjects") {
       edges {
         node {
           id
@@ -71,8 +67,6 @@ const entityStixCoreRelationshipsEntitiesFragment = graphql`
 
 export const entityStixCoreRelationshipsEntitiesQuery = graphql`
   query EntityStixCoreRelationshipsEntitiesViewLinesPaginationQuery(
-    $entityId: ID
-    $relationshipTypes: [String]
     $search: String
     $count: Int!
     $cursor: ID
@@ -83,8 +77,6 @@ export const entityStixCoreRelationshipsEntitiesQuery = graphql`
   ) {
     ...EntityStixCoreRelationshipsEntitiesViewLines_data
     @arguments(
-      entityId: $entityId
-      relationshipTypes: $relationshipTypes
       search: $search
       count: $count
       cursor: $cursor
@@ -117,7 +109,7 @@ EntityStixCoreRelationshipsEntitiesProps
     queryRef,
     linesQuery: entityStixCoreRelationshipsEntitiesQuery,
     linesFragment: entityStixCoreRelationshipsEntitiesFragment,
-    nodePath: ['stixCoreObjectsRegardingOf', 'pageInfo', 'globalCount'],
+    nodePath: ['stixCoreObjects', 'pageInfo', 'globalCount'],
     setNumberOfElements,
   });
   return (
@@ -126,12 +118,12 @@ EntityStixCoreRelationshipsEntitiesProps
       loadMore={loadMore}
       hasMore={hasMore}
       isLoading={isLoadingMore}
-      dataList={data?.stixCoreObjectsRegardingOf?.edges ?? []}
+      dataList={data?.stixCoreObjects?.edges ?? []}
       globalCount={
-        data?.stixCoreObjectsRegardingOf?.pageInfo?.globalCount ?? nbOfRowsToLoad
+        data?.stixCoreObjects?.pageInfo?.globalCount ?? nbOfRowsToLoad
       }
       LineComponent={EntityStixCoreRelationshipsEntitiesViewLine}
-      DummyLineComponent={EntityStixCoreRelationshipsEntitiesLineDummy}
+      DummyLineComponent={(props: DataColumns) => <EntityStixCoreRelationshipsEntitiesLineDummy {...props} dataColumns={dataColumns} />}
       dataColumns={dataColumns}
       nbOfRowsToLoad={nbOfRowsToLoad}
       paginationOptions={paginationOptions}
@@ -153,7 +145,14 @@ Omit<EntityStixCoreRelationshipsEntitiesProps, 'queryRef'>
     { count: 25, ...props.paginationOptions },
   );
   return queryRef ? (
-    <React.Suspense fallback={<Loader variant={LoaderVariant.inElement}/>}>
+    <React.Suspense fallback={<>
+      {Array(20)
+        .fill(0)
+        .map((_, idx) => (
+          <EntityStixCoreRelationshipsEntitiesLineDummy key={idx} dataColumns={props.dataColumns} />
+        ))}
+    </>}
+    >
       <EntityStixCoreRelationshipsEntitiesComponent
         {...props}
         queryRef={queryRef}

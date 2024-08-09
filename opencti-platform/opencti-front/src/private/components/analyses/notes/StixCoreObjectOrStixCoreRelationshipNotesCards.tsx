@@ -167,7 +167,7 @@ StixCoreObjectOrStixCoreRelationshipNotesCardsProps
 }) => {
   const { t_i18n } = useFormatter();
   const { isFeatureEnable } = useHelper();
-  const FAB_REPLACED = isFeatureEnable('FAB_REPLACEMENT');
+  const isFABReplaced = isFeatureEnable('FAB_REPLACEMENT');
   const classes = useStyles();
   const basicShape = {
     content: Yup.string().trim().min(2).required(t_i18n('This field is required')),
@@ -240,7 +240,7 @@ StixCoreObjectOrStixCoreRelationshipNotesCardsProps
     });
   };
   return (
-    <div style={{ marginTop: marginTop || 55 }}>
+    <div style={{ marginTop }}>
       <Typography variant="h4" gutterBottom={true} style={{ float: 'left' }}>
         {title}
       </Typography>
@@ -254,7 +254,7 @@ StixCoreObjectOrStixCoreRelationshipNotesCardsProps
           >
             <EditOutlined fontSize="small" />
           </IconButton>
-          {FAB_REPLACED
+          {isFABReplaced
             ? <AddNotesFunctionalComponent
                 stixCoreObjectOrStixCoreRelationshipId={id}
                 stixCoreObjectOrStixCoreRelationshipNotes={data}
@@ -283,7 +283,7 @@ StixCoreObjectOrStixCoreRelationshipNotesCardsProps
         })}
       <Security needs={[KNOWLEDGE_KNPARTICIPATE]}>
         <Accordion
-          style={{ margin: `${notes.length > 0 ? '30' : '0'}px 0 80px 0` }}
+          style={{ margin: `${notes.length > 0 ? '30' : '0'}px 0 0px 0` }}
           expanded={open}
           variant="outlined"
         >
